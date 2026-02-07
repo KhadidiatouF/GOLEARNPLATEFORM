@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* On retire le overflow hidden pour permettre le scroll */
+body {
+  margin: 0;
+  background-color: white;
+}
+
+/* Optionnel : Ajout d'une police serif élégante si non présente par défaut */
+@font-face {
+  font-family: 'Playfair Display';
+  src: url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap');
+}
+
+.font-serif {
+  font-family: 'Playfair Display', serif;
+}
