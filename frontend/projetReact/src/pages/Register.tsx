@@ -85,7 +85,7 @@ export default function Register() {
       {/* Image à gauche */}
       <div className="hidden lg:block w-1/2 relative">
         <img 
-          src="../src/assets/Sign up-pana.png" 
+          src="/Sign up-pana.png" 
           alt="Image d'inscription" 
           className="absolute inset-0 w-full h-full object-cover"
         />

@@ -106,7 +106,7 @@ const Formations: React.FC = () => {
      <section className="relative h-4/5 flex items-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="../src/assets/groupe.jpg" 
+            src="/groupe.jpg" 
             className="w-full h-full object-cover object-center"
             alt="Hero background"
           />

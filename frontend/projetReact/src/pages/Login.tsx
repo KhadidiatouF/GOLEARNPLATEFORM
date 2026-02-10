@@ -57,7 +57,7 @@ export default function Login() {
       {/* Image à gauche */}
       <div className="hidden lg:block w-1/2 relative">
         <img 
-          src="../src/assets/Mobile1.png" 
+          src="/Mobile1.png" 
           alt="Image de connexion" 
           className="absolute inset-0 w-full h-full object-cover"
         />
