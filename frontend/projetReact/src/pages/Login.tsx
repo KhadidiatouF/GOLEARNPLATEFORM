@@ -14,7 +14,6 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('apprenant');
   const [errors, setErrors] = useState<LoginErrors>({});
-  const [isAnimating, setIsAnimating] = useState(false);
   const [loginError, setLoginError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -49,7 +48,6 @@ export default function Login() {
     if (Object.keys(newErrors).length === 0) {
       const success = login(email, password, role);
       if (success) {
-        setIsAnimating(true);
         setTimeout(() => {
           // Redirection selon le profil
           switch (role) {
@@ -72,7 +70,6 @@ export default function Login() {
   };
 
   const handleVisitClick = () => {
-    setIsAnimating(true);
     setTimeout(() => {
       navigate('/');
     }, 300);
@@ -217,12 +214,20 @@ export default function Login() {
             </div>
           </div>
 
-          <p className="mt-6 text-center text-sm text-gray-600">
+          <p className="mt-4 text-center text-sm text-gray-600">
             Pas encore de compte ?{' '}
             <Link to="/register" className="text-purple-600 hover:text-purple-700 font-medium">
               S'inscrire
             </Link>
           </p>
+
+          <button
+            type="button"
+            onClick={handleVisitClick}
+            className="w-full mt-4 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm"
+          >
+            Visiter en tant que visiteur
+          </button>
         </div>
       </div>
     </div>
