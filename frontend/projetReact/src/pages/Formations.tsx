@@ -171,7 +171,7 @@ const Formations: React.FC = () => {
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition">
+                  <button className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition cursor-pointer">
                     Commencer la formation
                   </button>
                 </div>
@@ -219,7 +219,7 @@ const Formations: React.FC = () => {
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition">
+                  <button className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer">
                     S'inscrire maintenant
                   </button>
                 </div>

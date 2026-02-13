@@ -4,4 +4,8 @@ export default {
     extend: {},
   },
   plugins: [],
+  
+  future: {
+    colorFunctions: false
+  }
 }

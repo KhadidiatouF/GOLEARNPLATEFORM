@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth, type UserRole } from '../contexts/AuthContext';
+import './Login.css';
 
 interface LoginErrors {
   email?: string;
   password?: string;
+  role?: string;
 }
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<UserRole>('apprenant');
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isAnimating, setIsAnimating] = useState(false);
+  const [loginError, setLoginError] = useState('');
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const validateEmail = (email: string): boolean => {
@@ -18,14 +24,15 @@ export default function Login() {
     return re.test(email);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
+    setLoginError('');
     
     // Validation des champs
     const newErrors: LoginErrors = {};
     
     if (!email) {
-      newErrors.email = 'L\'email est requis';
+      newErrors.email = "L'email est requis";
     } else if (!validateEmail(email)) {
       newErrors.email = 'Veuillez entrer un email valide';
     }
@@ -40,8 +47,27 @@ export default function Login() {
     
     // Si pas d'erreurs, soumettre le formulaire
     if (Object.keys(newErrors).length === 0) {
-      console.log('Connexion avec:', email, password);
-      navigate('/');
+      const success = login(email, password, role);
+      if (success) {
+        setIsAnimating(true);
+        setTimeout(() => {
+          // Redirection selon le profil
+          switch (role) {
+            case 'admin':
+              navigate('/admin');
+              break;
+            case 'prof':
+              navigate('/prof');
+              break;
+            case 'apprenant':
+            default:
+              navigate('/formations');
+              break;
+          }
+        }, 300);
+      } else {
+        setLoginError('Identifiants incorrects');
+      }
     }
   };
 
@@ -50,6 +76,12 @@ export default function Login() {
     setTimeout(() => {
       navigate('/');
     }, 300);
+  };
+
+  const handleDemoLogin = (demoRole: UserRole, demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword(demoRole === 'admin' ? 'admin123' : demoRole === 'prof' ? 'prof123' : 'apprenant123');
+    setRole(demoRole);
   };
 
   return (
@@ -70,6 +102,13 @@ export default function Login() {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
           <h1 className="text-2xl font-bold text-center mb-6 text-purple-600">Connexion</h1>
+          
+          {loginError && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {loginError}
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -86,6 +125,7 @@ export default function Login() {
               />
               {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
             </div>
+            
             <div className="mb-6">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
               <input
@@ -101,24 +141,88 @@ export default function Login() {
               />
               {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
             </div>
-            <button 
-              type="submit" 
-              className="w-full bg-[#9333ea] text-white py-2 rounded-lg font-bold hover:bg-purple-700 transition cursor-pointer"
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Profil</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRole('apprenant')}
+                  className={`py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                    role === 'apprenant' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Apprenant
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('prof')}
+                  className={`py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                    role === 'prof' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Professeur
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('admin')}
+                  className={`py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                    role === 'admin' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  Admin
+                </button>
+              </div>
+            </div>
+            
+            <button
+              type="submit"
+              className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-medium"
             >
               Se connecter
             </button>
           </form>
-          <p className="mt-4 text-center text-sm text-gray-600">
-            Pas encore de compte ? <Link to="/register" className="text-purple-600 hover:underline">S'inscrire</Link>
+
+          {/* Accès rapide pour les démos */}
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-sm text-gray-500 text-center mb-3">Accès rapide (démonstration)</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('apprenant', 'apprenant@example.com')}
+                className="flex-1 bg-blue-100 text-blue-700 py-2 px-3 rounded-lg text-xs hover:bg-blue-200 transition-colors"
+              >
+                Demo Apprenant
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('prof', 'prof@example.com')}
+                className="flex-1 bg-green-100 text-green-700 py-2 px-3 rounded-lg text-xs hover:bg-green-200 transition-colors"
+              >
+                Demo Prof
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('admin', 'admin@example.com')}
+                className="flex-1 bg-red-100 text-red-700 py-2 px-3 rounded-lg text-xs hover:bg-red-200 transition-colors"
+              >
+                Demo Admin
+              </button>
+            </div>
+          </div>
+
+          <p className="mt-6 text-center text-sm text-gray-600">
+            Pas encore de compte ?{' '}
+            <Link to="/register" className="text-purple-600 hover:text-purple-700 font-medium">
+              S'inscrire
+            </Link>
           </p>
-          
-          {/* Bouton visiteur avec animation */}
-          <button
-            onClick={handleVisitClick}
-            className={`mt-6 w-full bg-transparent border-2 border-purple-600 text-purple-600 py-2 rounded-lg font-bold hover:bg-purple-600 hover:text-white transition cursor-pointer ${isAnimating ? 'scale-95' : ''}`}
-          >
-            Visiter sans connexion
-          </button>
         </div>
       </div>
     </div>
