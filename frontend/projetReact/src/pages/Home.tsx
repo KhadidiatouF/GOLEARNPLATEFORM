@@ -50,9 +50,9 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Section Formations - Design fidèle à la capture */}
-      <section className="px-6 py-20">
-        <h2 className="text-3xl font-serif font-bold text-center mb-12">Nos Formations</h2>
+      {/* Section Formations */}
+      <section className="px-4 md:px-6 py-16 md:py-20">
+        <h2 className="text-2xl md:text-3xl font-serif font-bold text-center mb-8 md:mb-12">Nos Formations</h2>
         
         {/* Barre de recherche arrondie */}
         <div className="max-w-2xl mx-auto mb-20">
@@ -71,9 +71,9 @@ const Home: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-16 items-center">
+        <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center">
           {/* Grille d'images avec bordure violette en pointillé */}
-          <div className="relative p-6 border-4 border-dashed border-[#a855f7] w-200 rounded-[40px] ml-50">
+          <div className="relative p-4 md:p-6 border-4 border-dashed border-[#a855f7] rounded-[40px] mx-4 md:mx-0 w-2/3 left-1/3">
             <div className="grid grid-cols-2 gap-4">
               <img src="https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400" className="rounded-tl-[80px] rounded-2xl w-full h-44 object-cover" alt="Student 1" />
               <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400" className="rounded-tr-2xl rounded-2xl w-full h-44 object-cover" alt="Student 2" />
@@ -83,12 +83,12 @@ const Home: React.FC = () => {
           </div>
 
           {/* Liste des avantages avec icônes violettes circulaires */}
-          <div className="space-y-10">
-            <h3 className="text-3xl font-serif leading-tight mr-60">
+          <div className="space-y-8 mt-8 md:mt-0 px-4 md:px-0">
+            <h3 className="text-2xl md:text-3xl font-serif leading-tight md:mr-48">
               <span className="text-[#a855f7] italic ">Bénéficiez</span> de nos cours en ligne
             </h3>
             
-            <div className="space-y-8 ml-40">
+            <div className="space-y-6 md:ml-40">
               {[
                 { icon: BookOpen, title: "Des cours pratiques", desc: "Avec de réels projets." },
                 { icon: Clock, title: "Apprentissage à votre rythme", desc: "Jusqu'à ce que vous maîtrisez réellement." },
@@ -113,11 +113,12 @@ const Home: React.FC = () => {
      
 
       {/* Footer Purple */}
-      <section className="bg-[#a855f7] py-20">
-        <div className="px-50">
+      <section className="bg-[#a855f7] py-12 md:py-20">
+        <div className="px-4 md:px-12 lg:px-50">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               {
+                id: 1,
                 img: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400",
                 name: "Développement Web",
                 desc: "Apprenez HTML, CSS et JavaScript pour créer des sites web modernes.",
@@ -125,33 +126,52 @@ const Home: React.FC = () => {
                 price: "Gratuit"
               },
               {
+                id: 2,
                 img: "https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=400",
                 name: "Data Science",
                 desc: "Maîtrisez Python, Pandas et l'analyse de données.",
                 hours: "30h",
-                price: "50€"
+                price: "35 000 CFA"
               },
               {
+                id: 3,
                 img: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400",
                 name: "UX/UI Design",
                 desc: "Concevez des interfaces utilisateur intuitives et attrayantes.",
                 hours: "25h",
-                price: "40€"
+                price: "25 000 CFA"
               }
             ].map((course, idx) => (
               <div key={idx} className="bg-white p-6 rounded-[30px] shadow-xl transition-transform hover:-translate-y-2">
-                <img src={course.img} alt={course.name} className="w-full h-48 object-cover rounded-[20px] mb-4" />
+                <div className="relative">
+                  <img src={course.img} alt={course.name} className="w-full h-48 object-cover rounded-[20px] mb-4" />
+                  {/* Badge de formation validée */}
+                  <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    Validée
+                  </div>
+                </div>
                 <h4 className="text-xl font-bold text-gray-800 mb-2">{course.name}</h4>
                 <p className="text-gray-600 text-sm mb-3">{course.desc}</p>
                 <div className="flex justify-between items-center text-sm mb-4">
                   <span className="text-gray-500">{course.hours}</span>
                   <span className="font-semibold text-[#a855f7]">{course.price}</span>
                 </div>
-                <button className="w-full bg-[#a855f7] text-white py-2 rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer">
-                  Découvrir le programme
+                <button 
+                  onClick={() => navigate(`/formations/${course.id}`)}
+                  className="w-full bg-[#a855f7] text-white py-2 rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer"
+                >
+                  Découvrir ce programme
                 </button>
               </div>
             ))}
+            
+            {/*
+              NOTE: Dans une application réelle avec backend:
+              - Les formations affichées ici seraient filtrées par status === 'validated'
+              - Les formations en attente de validation (status === 'pending') ne seraient pas visibles
+              - Seul l'administrateur peut valider les formations créées par les professeurs
+            */}
           </div>
         </div>
       </section>

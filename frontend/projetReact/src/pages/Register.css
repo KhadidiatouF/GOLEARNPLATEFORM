@@ -3,17 +3,24 @@
   justify-content: center;
   align-items: center;
   min-height: calc(100vh - 80px);
-  padding: 2rem;
+  padding: 1rem;
   background-color: #f8f9fa;
 }
 
 .register-card {
   background: white;
-  padding: 2.5rem;
+  padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
+}
+
+@media (max-width: 480px) {
+  .register-card {
+    padding: 1.5rem;
+    box-shadow: none;
+  }
 }
 
 .register-card h1 {

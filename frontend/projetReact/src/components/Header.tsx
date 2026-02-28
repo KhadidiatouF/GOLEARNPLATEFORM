@@ -1,12 +1,14 @@
-  import React from 'react';
+  import React, { useState } from 'react';
 import './Header.css';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserRole } from '../contexts/AuthContext';
+import { Menu, X } from 'lucide-react';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout, loading } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const getDashboardLink = () => {
     if (!user) return '/login';
@@ -58,7 +60,7 @@ const Header: React.FC = () => {
   }
 
   return (
-    <header className="fixed top-0 w-full flex justify-between items-center px-16 py-4 bg-white/95 backdrop-blur-md z-1000 border-b border-gray-100">
+    <header className="fixed top-0 w-full flex justify-between items-center px-4 md:px-16 py-4 bg-white/95 backdrop-blur-md z-1000 border-b border-gray-100">
       <div 
         className="text-xl font-black tracking-tight text-black cursor-pointer" 
         onClick={() => navigate('/')}
@@ -66,6 +68,15 @@ const Header: React.FC = () => {
         GOLEARN
       </div>
       
+      {/* Menu burger pour mobile */}
+      <button 
+        className="md:hidden p-2 text-gray-600"
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+      >
+        {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+      </button>
+
+      {/* Navigation desktop */}
       <nav className="hidden md:flex gap-8">
         <Link to="/" className="text-sm font-medium hover:text-purple-600 transition-colors">Accueil</Link>
         <Link to="/formations" className="text-sm font-medium hover:text-purple-600 transition-colors">Formations</Link>
@@ -74,7 +85,7 @@ const Header: React.FC = () => {
       </nav>
 
       {isAuthenticated && user ? (
-        <div className="flex gap-3 items-center">
+        <div className="hidden md:flex gap-3 items-center">
           <Link 
             to={getDashboardLink()}
             className="px-4 py-2 text-purple-600 text-sm font-medium hover:bg-purple-50 rounded-full transition-colors"
@@ -95,7 +106,7 @@ const Header: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="flex gap-3">
+        <div className="hidden md:flex gap-3">
           <button 
             onClick={() => navigate('/login')}
             className="px-6 py-2 bg-[#9333ea] text-white rounded-full text-xs font-bold hover:bg-purple-700 transition cursor-pointer"
@@ -108,6 +119,60 @@ const Header: React.FC = () => {
           >
             S'inscrire
           </button>
+        </div>
+      )}
+
+      {/* Menu mobile */}
+      {mobileMenuOpen && (
+        <div className="absolute top-full left-0 w-full bg-white shadow-lg md:hidden">
+          <div className="flex flex-col p-4 gap-4">
+            <Link to="/" className="text-sm font-medium hover:text-purple-600" onClick={() => setMobileMenuOpen(false)}>Accueil</Link>
+            <Link to="/formations" className="text-sm font-medium hover:text-purple-600" onClick={() => setMobileMenuOpen(false)}>Formations</Link>
+            <a href="#" className="text-sm font-medium hover:text-purple-600">A propos</a>
+            <a href="#" className="text-sm font-medium hover:text-purple-600">Contact</a>
+            <hr className="my-2" />
+            {isAuthenticated && user ? (
+              <>
+                <Link 
+                  to={getDashboardLink()}
+                  className="px-4 py-2 text-purple-600 text-sm font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Mon Dashboard
+                </Link>
+                <button 
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-full text-xs font-bold"
+                >
+                  Déconnexion
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={() => {
+                    navigate('/login');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-6 py-2 bg-[#9333ea] text-white rounded-full text-xs font-bold"
+                >
+                  Se connecter
+                </button>
+                <button 
+                  onClick={() => {
+                    navigate('/register');
+                    setMobileMenuOpen(false);
+                  }}
+                  className="px-6 py-2 bg-[#9333ea] text-white rounded-full text-xs font-bold"
+                >
+                  S'inscrire
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </header>

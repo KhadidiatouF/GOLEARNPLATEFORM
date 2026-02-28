@@ -82,7 +82,7 @@ export default function Register() {
 
   return (
     <div className="w-screen h-screen bg-gray-100 flex">
-      {/* Image à gauche */}
+      {/* Image à gauche - cachée sur mobile */}
       <div className="hidden lg:block w-1/2 relative">
         <img 
           src="/Sign up-pana.png" 
@@ -95,8 +95,8 @@ export default function Register() {
       </div>
       
       {/* Formulaire à droite */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 md:p-8">
+        <div className="bg-white p-6 md:p-8 rounded-lg shadow-lg w-full max-w-md">
           <h1 className="text-2xl font-bold text-center mb-6 text-purple-600">Inscription</h1>
           <form onSubmit={handleSubmit}>
             <div className="mb-4">

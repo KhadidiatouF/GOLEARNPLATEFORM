@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Formations from './pages/Formations';
+import FormationDetail from './pages/FormationDetail';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfDashboard from './pages/ProfDashboard';
 import ApprenantDashboard from './pages/ApprenantDashboard';
@@ -19,6 +20,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/formations" element={<Formations />} />
+          <Route path="/formations/:id" element={<FormationDetail />} />
           
           {/* Routes protégées par profil */}
           <Route 

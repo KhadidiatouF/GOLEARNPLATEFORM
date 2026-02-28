@@ -70,3 +70,27 @@
 .btn-signup:hover {
   background-color: #0056b3;
 }
+
+/* Styles responsive pour mobile */
+@media (max-width: 768px) {
+  .header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .logo h1 {
+    font-size: 1.25rem;
+  }
+  
+  .nav {
+    display: none;
+  }
+  
+  .actions {
+    gap: 0.5rem;
+  }
+  
+  .btn-login, .btn-signup {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
