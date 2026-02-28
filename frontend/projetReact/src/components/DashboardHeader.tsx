@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface DashboardHeaderProps {
-  color: 'purple' | 'green' | 'blue';
+  color: 'purple';
 }
 
 const colorMap = {

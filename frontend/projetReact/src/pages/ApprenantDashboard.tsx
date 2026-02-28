@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import DashboardHeader from '../components/DashboardHeader';
 import Certificate from '../components/Certificate';
-import { BookOpen, Clock, Calendar, PlayCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, Clock, Calendar, PlayCircle, Search, ChevronLeft, ChevronRight, TrendingUp, Award } from 'lucide-react';
 
 type TabType = 'dashboard' | 'formations' | 'progression' | 'certificats' | 'messages';
 
@@ -146,19 +146,43 @@ export default function ApprenantDashboard() {
               </div>
             </div>
 
-            {/* Les 3 cartes de stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-linear-to-br from-blue-500 to-blue-700 rounded-xl p-6 text-white">
-                <h3 className="text-3xl font-bold">5</h3>
-                <p className="opacity-90">Formations inscrites</p>
+            {/* Les 4 cartes de statistiques */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-blue-100 rounded-full">
+                    <BookOpen className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-blue-700">5</h3>
+                <p className="text-blue-600 font-medium">Formations inscrites</p>
               </div>
-              <div className="bg-linear-to-br from-green-500 to-green-700 rounded-xl p-6 text-white">
-                <h3 className="text-3xl font-bold">67%</h3>
-                <p className="opacity-90">Progression moyenne</p>
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-green-100 rounded-full">
+                    <TrendingUp className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-green-700">67%</h3>
+                <p className="text-green-600 font-medium">Progression moyenne</p>
               </div>
-              <div className="bg-linear-to-br from-purple-500 to-purple-700 rounded-xl p-6 text-white">
-                <h3 className="text-3xl font-bold">3</h3>
-                <p className="opacity-90">Certificats obtenus</p>
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-purple-100 rounded-full">
+                    <Award className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-purple-700">3</h3>
+                <p className="text-purple-600 font-medium">Certificats obtenus</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-orange-100 rounded-full">
+                    <Clock className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-orange-700">24h</h3>
+                <p className="text-orange-600 font-medium">Heures de formation</p>
               </div>
             </div>
 
@@ -524,13 +548,13 @@ export default function ApprenantDashboard() {
 
   return (
     <div className="w-screen h-screen bg-gray-100">
-      <DashboardHeader color="blue" />
+      <DashboardHeader color="purple" />
       
       {/* Desktop sidebar */}
       <aside className={`hidden lg:fixed left-0 top-16 h-screen bg-white shadow-lg z-40 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} lg:block`}>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-6 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-blue-700 transition-colors"
+          className="absolute -right-3 top-6 w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-purple-700 transition-colors"
         >
           <svg className={`w-4 h-4 transition-transform ${sidebarOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -539,11 +563,11 @@ export default function ApprenantDashboard() {
 
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">A</span>
             </div>
             {sidebarOpen && (
-              <span className="font-bold text-xl text-blue-600">Apprenant</span>
+              <span className="font-bold text-xl text-purple-600">Apprenant</span>
             )}
           </div>
         </div>
@@ -555,7 +579,7 @@ export default function ApprenantDashboard() {
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 activeTab === item.id
-                  ? 'bg-blue-100 text-blue-600'
+                  ? 'bg-purple-100 text-purple-600'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -600,7 +624,7 @@ export default function ApprenantDashboard() {
               onClick={() => setActiveTab(item.id)}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                 activeTab === item.id
-                  ? 'text-blue-600'
+                  ? 'text-purple-600'
                   : 'text-gray-500'
               }`}
             >

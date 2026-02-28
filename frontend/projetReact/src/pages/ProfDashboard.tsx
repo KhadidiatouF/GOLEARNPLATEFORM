@@ -174,19 +174,43 @@ export default function ProfDashboard() {
               </div>
             </div>
 
-            {/* Les 3 cartes de stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-linear-to-br from-green-500 to-green-700 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-                <h3 className="text-3xl font-bold">12</h3>
-                <p className="opacity-90">Formations actives</p>
+            {/* Les 4 cartes de statistiques */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-green-100 rounded-full">
+                    <BookOpen className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-green-700">12</h3>
+                <p className="text-green-600 font-medium">Formations actives</p>
               </div>
-              <div className="bg-linear-to-br from-blue-500 to-blue-700 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-                <h3 className="text-3xl font-bold">89</h3>
-                <p className="opacity-90">Apprenants inscrits</p>
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-blue-100 rounded-full">
+                    <Users className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-blue-700">89</h3>
+                <p className="text-blue-600 font-medium">Apprenants inscrits</p>
               </div>
-              <div className="bg-linear-to-br from-orange-500 to-orange-700 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
-                <h3 className="text-3xl font-bold">23</h3>
-                <p className="opacity-90">Travaux en attente</p>
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-orange-100 rounded-full">
+                    <Clock className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-orange-700">23</h3>
+                <p className="text-orange-600 font-medium">Travaux en attente</p>
+              </div>
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="p-3 bg-purple-100 rounded-full">
+                    <CheckCircle className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+                <h3 className="text-3xl font-bold text-purple-700">156</h3>
+                <p className="text-purple-600 font-medium">Formations validées</p>
               </div>
             </div>
 
@@ -726,13 +750,13 @@ export default function ProfDashboard() {
 
   return (
     <div className=" w-screen h-screen bg-gray-100">
-      <DashboardHeader color="green" />
+      <DashboardHeader color="purple" />
       
       {/* Desktop sidebar */}
       <aside className={`hidden lg:fixed left-0 top-16 h-screen bg-white shadow-lg z-40 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'} lg:block`}>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-6 w-6 h-6 bg-green-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-green-700 transition-colors"
+          className="absolute -right-3 top-6 w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-purple-700 transition-colors"
         >
           <svg className={`w-4 h-4 transition-transform ${sidebarOpen ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -741,11 +765,11 @@ export default function ProfDashboard() {
 
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">P</span>
             </div>
             {sidebarOpen && (
-              <span className="font-bold text-xl text-green-600">Professeur</span>
+              <span className="font-bold text-xl text-purple-600">Professeur</span>
             )}
           </div>
         </div>
@@ -757,7 +781,7 @@ export default function ProfDashboard() {
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                 activeTab === item.id
-                  ? 'bg-green-100 text-green-600'
+                  ? 'bg-purple-100 text-purple-600'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
@@ -802,7 +826,7 @@ export default function ProfDashboard() {
               onClick={() => setActiveTab(item.id)}
               className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors ${
                 activeTab === item.id
-                  ? 'text-green-600'
+                  ? 'text-purple-600'
                   : 'text-gray-500'
               }`}
             >
