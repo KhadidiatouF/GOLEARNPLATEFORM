@@ -37,7 +37,10 @@ const Home: React.FC = () => {
               >
                 Découvrir les formations
               </button>
-              <button className="px-6 py-3 bg-[#a855f7] text-white rounded-md text-l font-bold hover:bg-purple-700 transition shadow-lg cursor-pointer">
+              <button
+                onClick={() => navigate('/formations')}
+                className="px-6 py-3 bg-[#a855f7] text-white rounded-md text-l font-bold hover:bg-purple-700 transition shadow-lg cursor-pointer"
+              >
                 Commencer maintenant
               </button>
             </div>

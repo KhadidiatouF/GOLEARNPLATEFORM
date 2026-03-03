@@ -1,6 +1,8 @@
 import React from 'react';
 import Header from '../components/Header';
 import { Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Formation {
   id: number;
@@ -95,7 +97,55 @@ const formationsData: Formation[] = [
 ];
 
 const Formations: React.FC = () => {
-  const freeFormations = formationsData.filter(f => f.isFree);
+  const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+
+  // Vérifier si une formation est gratuite (prix = 0, Gratuit, ou 0 CFA)
+  const isFormationFree = (price: string, isFree: boolean): boolean => {
+    return isFree || price === 'Gratuit' || price === '0' || price === '0 CFA';
+  };
+
+  // Gérer l'inscription à une formation gratuite
+  const handleFreeEnrollment = (formation: Formation): void => {
+    if (!isAuthenticated || !user) {
+      // Rediriger vers la page de connexion avec l'URL de retour
+      navigate('/login', { state: { from: { pathname: `/formations` }, formationId: formation.id } });
+      return;
+    }
+
+    // Vérifier si l'utilisateur est déjà inscrit à cette formation
+    const inscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
+    const dejaInscrit = inscriptions.some(
+      (inscription: { coursId: number; utilisateurId: number }) => 
+        inscription.coursId === formation.id && inscription.utilisateurId === user.id
+    );
+
+    if (dejaInscrit) {
+      // Rediriger directement vers le dashboard
+      navigate('/apprenant');
+      return;
+    }
+
+    // Simuler l'inscription dans localStorage
+    const inscription = {
+      id: `${formation.id}-${user.id}`,
+      coursId: formation.id,
+      utilisateurId: user.id,
+      dateInscription: new Date().toISOString(),
+      coursTitre: formation.title
+    };
+
+    // Sauvegarder dans localStorage
+    inscriptions.push(inscription);
+    localStorage.setItem('inscriptions', JSON.stringify(inscriptions));
+
+    console.log('Inscription créée (gratuit):', inscription);
+
+    // Rediriger vers le dashboard
+    navigate('/apprenant');
+  };
+
+  const freeFormations = formationsData.filter(f => isFormationFree(f.price, f.isFree));
   const paidFormations = formationsData.filter(f => !f.isFree);
 
   return (
@@ -171,7 +221,10 @@ const Formations: React.FC = () => {
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition cursor-pointer">
+                  <button 
+                    onClick={() => handleFreeEnrollment(formation)}
+                    className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition cursor-pointer"
+                  >
                     Commencer la formation
                   </button>
                 </div>
@@ -219,7 +272,10 @@ const Formations: React.FC = () => {
                       </li>
                     ))}
                   </ul>
-                  <button className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer">
+                  <button 
+                    onClick={() => navigate(`/formation/${formation.id}`)}
+                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer"
+                  >
                     S'inscrire maintenant
                   </button>
                 </div>

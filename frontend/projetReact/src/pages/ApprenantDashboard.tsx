@@ -19,6 +19,26 @@ interface CertificateData {
   instructor: string;
 }
 
+interface EnrolledFormation {
+  id: number;
+  title: string;
+  professor: string;
+  duration: string;
+  image: string;
+  dateInscription: string;
+  progress: number;
+}
+
+// Données des formations disponibles
+const formationsData: EnrolledFormation[] = [
+  { id: 1, title: 'Développement Web Complet', professor: 'Pr. Martin', duration: '12 semaines', image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600', dateInscription: '', progress: 0 },
+  { id: 2, title: 'Introduction à la Programmation', professor: 'Pr. Dupont', duration: '6 semaines', image: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600', dateInscription: '', progress: 0 },
+  { id: 3, title: 'Marketing Digital', professor: 'Pr. Martin', duration: '6 semaines', image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600', dateInscription: '', progress: 0 },
+  { id: 4, title: 'Data Science avec Python', professor: 'Pr. Dupont', duration: '10 semaines', image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600', dateInscription: '', progress: 0 },
+  { id: 5, title: 'UX/UI Design Professionnel', professor: 'Pr. Martin', duration: '8 semaines', image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600', dateInscription: '', progress: 0 },
+  { id: 6, title: 'Cybersécurité', professor: 'Pr. Dupont', duration: '14 semaines', image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600', dateInscription: '', progress: 0 },
+];
+
 const menuItems: MenuItem[] = [
   {
     id: 'dashboard',
@@ -329,15 +349,29 @@ export default function ApprenantDashboard() {
 
             {/* Formations filtrées */}
             {(() => {
-              const allFormations = [
-                { id: 1, title: 'Introduction à React', professor: 'Pr. Martin', progress: 75 },
-                { id: 2, title: 'JavaScript Avancé', professor: 'Pr. Dupont', progress: 50 },
-                { id: 3, title: 'TypeScript Fundamentals', professor: 'Pr. Martin', progress: 25 },
-                { id: 4, title: 'Node.js Backend', professor: 'Pr. Dupont', progress: 10 },
-                { id: 5, title: 'Python Basics', professor: 'Pr. Martin', progress: 0 },
-                { id: 6, title: 'CSS Avancé', professor: 'Pr. Dupont', progress: 0 },
-              ];
-              const filteredFormations = allFormations.filter(formation => {
+              // Charger les inscriptions depuis localStorage
+              const storedInscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
+              
+              // Filtrer les inscriptions pour l'utilisateur actuel
+              const userInscriptions = storedInscriptions.filter(
+                (inscription: { utilisateurId: number }) => 
+                  user && inscription.utilisateurId === user.id
+              );
+              
+              // Mapper les inscriptions aux formations
+              const allFormations = userInscriptions.map((inscription: { coursId: number; coursTitre: string; dateInscription: string }) => {
+                const formationInfo = formationsData.find(f => f.id === inscription.coursId) || { professor: 'Pr. à confirmer', duration: 'À définir', image: '' };
+                return {
+                  id: inscription.coursId,
+                  title: inscription.coursTitre,
+                  professor: formationInfo.professor,
+                  duration: formationInfo.duration,
+                  image: formationInfo.image,
+                  dateInscription: inscription.dateInscription,
+                  progress: 0
+                };
+              });
+              const filteredFormations = allFormations.filter((formation: EnrolledFormation) => {
                 const matchesSearch = formation.title.toLowerCase().includes(formationSearch.toLowerCase());
                 const matchesProf = !formationFilterProf || formation.professor === formationFilterProf;
                 return matchesSearch && matchesProf;
@@ -351,7 +385,7 @@ export default function ApprenantDashboard() {
               return (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {paginatedFormations.map((formation) => (
+                    {paginatedFormations.map((formation: EnrolledFormation) => (
                       <div key={formation.id} className="border rounded-lg p-4">
                         <h3 className="font-semibold">{formation.title}</h3>
                         <p className="text-sm text-gray-500 mb-2">{formation.professor}</p>

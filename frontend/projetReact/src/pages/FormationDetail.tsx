@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, Users, Award, CheckCircle, PlayCircle, Star } from 'lucide-react';
 import Header from '../components/Header';
+import PaymentModal from '../components/PaymentModal';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Session {
   id: number;
@@ -22,8 +24,87 @@ interface Cours {
 const FormationDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const [cours, setCours] = useState<Cours | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [enrollmentMessage, setEnrollmentMessage] = useState<string | null>(null);
+
+  // Gérer l'inscription à un cours gratuit
+  const handleFreeEnrollment = () => {
+    if (!isAuthenticated) {
+      // Rediriger vers la page de connexion
+      navigate('/login', { state: { from: { pathname: `/formations/${id}` } } });
+      return;
+    }
+
+    // Simuler l'inscription
+    const inscription = {
+      id: Math.random(),
+      coursId: cours?.id,
+      utilisateurId: user?.id,
+      dateInscription: new Date().toISOString(),
+      coursTitre: cours?.titre
+    };
+
+    console.log('Inscription créée (gratuit):', inscription);
+
+    // Afficher le message de succès
+    setEnrollmentMessage(`Inscription au cours "${cours?.titre}" réussie ! Vous pouvez maintenant accéder au contenu.`);
+
+    // Rediriger vers le dashboard après 2 secondes
+    setTimeout(() => {
+      navigate('/apprenant');
+    }, 2000);
+  };
+
+  // Gérer l'inscription à un cours payant
+  const handlePaidEnrollment = () => {
+    if (!isAuthenticated) {
+      // Rediriger vers la page de connexion
+      navigate('/login', { state: { from: { pathname: `/formations/${id}` } } });
+      return;
+    }
+
+    // Afficher le modal de paiement
+    setShowPaymentModal(true);
+  };
+
+  // Gérer le succès du paiement
+  const handlePaymentSuccess = (paymentMethod: string) => {
+    if (!cours || !user) return;
+
+    // Simuler l'enregistrement du paiement
+    const paiement = {
+      id: Math.random(),
+      montant: cours.prix,
+      datePaiement: new Date().toISOString(),
+      methode: paymentMethod,
+      coursId: cours.id,
+      utilisateurId: user.id
+    };
+
+    console.log('Paiement enregistré:', paiement);
+
+    // Simuler l'inscription après paiement
+    const inscription = {
+      id: Math.random(),
+      coursId: cours.id,
+      utilisateurId: user.id,
+      dateInscription: new Date().toISOString(),
+      coursTitre: cours.titre
+    };
+
+    console.log('Inscription créée (payant):', inscription);
+
+    // Afficher le message de succès
+    setEnrollmentMessage(`Paiement réussi ! Vous êtes inscrit au cours "${cours.titre}". Redirection vers votre tableau de bord...`);
+
+    // Rediriger vers le dashboard après 2 secondes
+    setTimeout(() => {
+      navigate('/apprenant');
+    }, 2000);
+  };
 
   useEffect(() => {
     // Données mock pour les 3 formations
@@ -195,7 +276,7 @@ const FormationDetail: React.FC = () => {
                   </p>
                 )}
                 <button 
-                  onClick={() => isGratuit ? navigate('/formations') : navigate('/register')}
+                  onClick={() => isGratuit ? handleFreeEnrollment() : handlePaidEnrollment()}
                   className="w-full py-4 bg-[#a855f7] text-white rounded-xl font-bold text-lg hover:bg-purple-700 transition shadow-lg"
                 >
                   {isGratuit ? 'Commencer maintenant' : "S'inscrire"}
@@ -347,13 +428,37 @@ const FormationDetail: React.FC = () => {
             Rejoignez des milliers d'apprenants et lancez-vous dès aujourd'hui !
           </p>
           <button 
-            onClick={() => isGratuit ? navigate('/formations') : navigate('/register')}
+            onClick={() => isGratuit ? handleFreeEnrollment() : handlePaidEnrollment()}
             className="px-8 py-4 bg-white text-[#a855f7] rounded-full font-bold text-lg hover:bg-gray-100 transition shadow-xl"
           >
             {isGratuit ? 'Commencer maintenant' : "S'inscrire maintenant"}
           </button>
         </div>
       </section>
+
+      {/* Message de succès d'inscription */}
+      {enrollmentMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Inscription réussie !</h3>
+            <p className="text-gray-600">{enrollmentMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de paiement */}
+      {cours && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          courseName={cours.titre}
+          amount={cours.prix}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 };
