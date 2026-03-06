@@ -86,14 +86,24 @@ const FormationDetail: React.FC = () => {
 
     console.log('Paiement enregistré:', paiement);
 
-    // Simuler l'inscription après paiement
+    // Sauvegarder le paiement dans localStorage
+    const paiements = JSON.parse(localStorage.getItem('paiements') || '[]');
+    paiements.push(paiement);
+    localStorage.setItem('paiements', JSON.stringify(paiements));
+
+    // Créer et sauvegarder l'inscription après paiement
     const inscription = {
-      id: Math.random(),
+      id: `${cours.id}-${user.id}`,
       coursId: cours.id,
       utilisateurId: user.id,
       dateInscription: new Date().toISOString(),
       coursTitre: cours.titre
     };
+
+    // Sauvegarder dans localStorage
+    const inscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
+    inscriptions.push(inscription);
+    localStorage.setItem('inscriptions', JSON.stringify(inscriptions));
 
     console.log('Inscription créée (payant):', inscription);
 
