@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { apiUsers } from '../api/apiUsers';
 import DashboardHeader from '../components/DashboardHeader';
 import { Clock, Calendar, Bell, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../components/Modal';
@@ -94,15 +95,25 @@ export default function AdminDashboard() {
   ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isUserDeleteDialogOpen, setIsUserDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<number | null>(null);
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
   
+  // Type pour les utilisateurs
+  interface User {
+    id: number;
+    nom: string;
+    prenom: string;
+    email: string;
+    login: string;
+    role: string;
+  }
+
   // Gestion des utilisateurs
-  const [users, setUsers] = useState([
-    { id: 1, name: 'Jean Martin', email: 'jean@example.com', role: 'apprenant', status: 'actif' },
-    { id: 2, name: 'Marie Dupont', email: 'marie@example.com', role: 'professeur', status: 'actif' },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<{ id: number | undefined; name: string; email: string; role: string; status: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ id: number | undefined; nom: string; prenom: string; email: string; login: string; mdp?: string; role: string } | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   // États pour la pagination et filtration des formations
@@ -298,17 +309,26 @@ export default function AdminDashboard() {
 
   // Handlers pour la gestion des utilisateurs
   const handleAddUser = () => {
-    setEditingUser({ id: undefined, name: '', email: '', role: 'apprenant', status: 'actif' });
+    setEditingUser({ id: undefined, nom: '', prenom: '', email: '', login: '', mdp: '', role: 'APPRENANT' });
     setIsUserModalOpen(true);
   };
 
-  const handleEditUser = (user: { id: number; name: string; email: string; role: string; status: string }) => {
+  const handleEditUser = (user: { id: number; nom: string; prenom: string; email: string; login: string; mdp?: string; role: string }) => {
     setEditingUser(user);
     setIsUserModalOpen(true);
   };
 
   const handleDeleteUser = (id: number) => {
-    setUsers(users.filter(u => u.id !== id));
+    setUserToDelete(id);
+    setIsUserDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteUser = () => {
+    if (userToDelete) {
+      setUsers(users.filter(u => u.id !== userToDelete));
+      setUserToDelete(null);
+      setIsUserDeleteDialogOpen(false);
+    }
   };
 
   const handleSaveUser = (e: React.FormEvent) => {
@@ -334,6 +354,28 @@ export default function AdminDashboard() {
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Charger les utilisateurs depuis l'API
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const usersData = await apiUsers.getUsers();
+        console.log('Données reçues:', usersData);
+        // Les données viennent du backend directement dans le bon format
+        if (usersData && Array.isArray(usersData)) {
+          setUsers(usersData);
+        } else {
+          console.log('Format de données inattendu:', usersData);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des utilisateurs:', error);
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+
+    fetchUsers();
   }, []);
 
   const formatTime = (date: Date) => {
@@ -622,7 +664,8 @@ const getFirstDayOfMonth = (year: number, month: number) => {
             {(() => {
               const filteredUsers = users.filter(user => {
                 const matchesSearch = 
-                  user.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+                  user.nom.toLowerCase().includes(userSearch.toLowerCase()) ||
+                  user.prenom.toLowerCase().includes(userSearch.toLowerCase()) ||
                   user.email.toLowerCase().includes(userSearch.toLowerCase());
                 const matchesRole = !userFilterRole || user.role === userFilterRole;
                 return matchesSearch && matchesRole;
@@ -640,47 +683,57 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nom</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prénom</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rôle</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {paginatedUsers.map((user) => (
-                          <tr key={user.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">{user.name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">{user.email}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                user.role === 'professeur' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                {user.role === 'professeur' ? 'Professeur' : 'Apprenant'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                user.status === 'actif' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                              }`}>
-                                {user.status === 'actif' ? 'Actif' : 'Inactif'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <button 
-                                onClick={() => handleEditUser(user)}
-                                className="text-purple-600 hover:text-purple-800 mr-3"
-                              >
-                                Modifier
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                Supprimer
-                              </button>
+                        {usersLoading ? (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                              Chargement des utilisateurs...
                             </td>
                           </tr>
-                        ))}
+                        ) : paginatedUsers.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                              Aucun utilisateur trouvé
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedUsers.map((user) => (
+                            <tr key={user.id}>
+                              <td className="px-6 py-3 whitespace-nowrap text-left ">{user.nom}</td>
+                              <td className="px-6 py-3 whitespace-nowrap text-left ">{user.prenom}</td>
+                              <td className="px-6 py-3 whitespace-nowrap text-left ">{user.email}</td>
+                              <td className="px-6 py-3 whitespace-nowrap text-left ">
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  user.role === 'APPRENANT' ? 'bg-blue-100 text-blue-700' : user.role === 'PROF' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'
+                                }`}>
+                                  {user.role === 'APPRENANT' ? 'Apprenant' : user.role === 'PROF' ? 'Professeur' : 'Admin'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-3 whitespace-nowrap text-left ">
+                                <button
+                                  onClick={() => handleEditUser(user)}
+                                  className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors"
+                                  title="Modifier"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -928,6 +981,18 @@ const getFirstDayOfMonth = (year: number, month: number) => {
               cancelText="Annuler"
               onConfirm={handleDeleteCourse}
               onCancel={() => setIsDeleteDialogOpen(false)}
+              type="danger"
+            />
+
+            {/* Dialog de confirmation de suppression utilisateur */}
+            <ConfirmDialog
+              isOpen={isUserDeleteDialogOpen}
+              title="Supprimer l'utilisateur"
+              message="Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible."
+              confirmText="Supprimer"
+              cancelText="Annuler"
+              onConfirm={confirmDeleteUser}
+              onCancel={() => setIsUserDeleteDialogOpen(false)}
               type="danger"
             />
 
@@ -1271,16 +1336,29 @@ const getFirstDayOfMonth = (year: number, month: number) => {
         size="md"
       >
         <form onSubmit={handleSaveUser} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nom complet</label>
-            <input
-              type="text"
-              value={editingUser?.name || ''}
-              onChange={(e) => setEditingUser(editingUser ? { ...editingUser, name: e.target.value } : null)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Ex: Jean Martin"
-              required
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+              <input
+                type="text"
+                value={editingUser?.nom || ''}
+                onChange={(e) => setEditingUser(editingUser ? { ...editingUser, nom: e.target.value } : null)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Nom"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+              <input
+                type="text"
+                value={editingUser?.prenom || ''}
+                onChange={(e) => setEditingUser(editingUser ? { ...editingUser, prenom: e.target.value } : null)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Prénom"
+                required
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
@@ -1297,26 +1375,37 @@ const getFirstDayOfMonth = (year: number, month: number) => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
               <select
-                value={editingUser?.role || 'apprenant'}
+                value={editingUser?.role || 'APPRENANT'}
                 onChange={(e) => setEditingUser(editingUser ? { ...editingUser, role: e.target.value } : null)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
-                <option value="apprenant">Apprenant</option>
-                <option value="professeur">Professeur</option>
-                <option value="admin">Admin</option>
+                <option value="APPRENANT">Apprenant</option>
+                <option value="PROF">Professeur</option>
+                <option value="ADMIN">Admin</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Statut</label>
-              <select
-                value={editingUser?.status || 'actif'}
-                onChange={(e) => setEditingUser(editingUser ? { ...editingUser, status: e.target.value } : null)}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Login</label>
+              <input
+                type="text"
+                value={editingUser?.login || ''}
+                onChange={(e) => setEditingUser(editingUser ? { ...editingUser, login: e.target.value } : null)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="actif">Actif</option>
-                <option value="inactif">Inactif</option>
-              </select>
+                placeholder="Login utilisateur"
+                required
+              />
             </div>
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+            <input
+              type="password"
+              value={editingUser?.mdp || ''}
+              onChange={(e) => setEditingUser(editingUser ? { ...editingUser, mdp: e.target.value } : null)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              placeholder={editingUser?.id ? 'Laissez vide pour garder l\'actuel' : 'Mot de passe'}
+              required={!editingUser?.id}
+            />
           </div>
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200">Annuler</button>

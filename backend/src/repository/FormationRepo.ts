@@ -18,7 +18,9 @@ export class FormationRepo implements IRepository<Formation> {
             where: { id },
             include: { 
                 professeur: { include: { utilisateur: true } },
-                sessions: true,
+                sessions: {
+                    include: { chapitres: true, quiz: true }
+                },
                 apprenants: true
             }
         });
@@ -34,5 +36,15 @@ export class FormationRepo implements IRepository<Formation> {
 
     async delete(id: number): Promise<void> {
         await this.prisma.formation.delete({ where: { id } });
+    }
+
+    async findByProfesseurId(professeurId: number): Promise<Formation[]> {
+        return await this.prisma.formation.findMany({
+            where: { professeurId },
+            include: { 
+                professeur: { include: { utilisateur: true } },
+                sessions: true
+            }
+        });
     }
 }

@@ -1,119 +1,105 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import { Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { apiFormation } from '../api/apiFormation';
 
 interface Formation {
   id: number;
-  title: string;
+  titre: string;
   description: string;
-  price: string;
-  duration: string;
-  level: string;
-  image: string;
-  features: string[];
-  isFree: boolean;
+  prix: number;
+  categorie: string;
+  niveau: string;
+  typeCours: string;
+  image?: string;
 }
 
-const formationsData: Formation[] = [
-  {
-    id: 1,
-    title: "Développement Web Complet",
-    description: "Apprenez HTML, CSS, JavaScript, React et Node.js pour devenir développeur web full-stack.",
-    price: "Gratuit",
-    duration: "12 semaines",
-    level: "Débutant",
-    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600",
-    features: ["HTML5 & CSS3", "JavaScript ES6+", "React.js", "Node.js & Express", "Base de données SQL", "Projet final"],
-    isFree: true
-  },
-  {
-    id: 2,
-    title: "Introduction à la Programmation",
-    description: "Apprenez les bases de la programmation avec Python, idéal pour les débutants.",
-    price: "Gratuit",
-    duration: "6 semaines",
-    level: "Débutant",
-    image: "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600",
-    features: ["Logique de programmation", "Variables et types", "Boucles et conditions", "Fonctions", "Structures de données", "Petits projets"],
-    isFree: true
-  },
-  {
-    id: 2,
-    title: "Data Science avec Python",
-    description: "Maîtrisez Python, Pandas, NumPy et Machine Learning pour analyser des données.",
-    price: "35 000 CFA",
-    duration: "10 semaines",
-    level: "Intermédiaire",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600",
-    features: ["Python avancé", "Pandas & NumPy", "Visualisation de données", "Machine Learning", "Deep Learning", "Certification"],
-    isFree: false
-  },
-  {
-    id: 3,
-    title: "UX/UI Design Professionnel",
-    description: "Apprenez à concevoir des interfaces utilisateur modernes et ergonomiques.",
-    price: "25 000 CFA",
-    duration: "8 semaines",
-    level: "Débutant",
-    image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600",
-    features: ["Figma", "Design Thinking", "Wireframing", "Prototypage", "Tests utilisateurs", "Portfolio"],
-    isFree: false
-  },
-  {
-    id: 4,
-    title: "Marketing Digital",
-    description: "Devenez expert en marketing digital et en stratégies de croissance.",
-    price: "Gratuit",
-    duration: "6 semaines",
-    level: "Débutant",
-    image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600",
-    features: ["SEO", "Google Ads", "Réseaux sociaux", "Email marketing", "Analytics", "Projet pratique"],
-    isFree: true
-  },
-  {
-    id: 5,
-    title: "Cybersécurité",
-    description: "Apprenez à protéger les systèmes et les données contre les cybermenaces.",
-    price: "50 000 CFA",
-    duration: "14 semaines",
-    level: "Avancé",
-    image: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600",
-    features: ["Ethical Hacking", "Sécurité réseau", "Cryptographie", "Pentesting", "Compliance", "Certification"],
-    isFree: false
-  },
-  {
-    id: 6,
-    title: "Intelligence Artificielle",
-    description: "Explorez les concepts avancés de l'IA et du Deep Learning.",
-    price: "60 000 CFA",
-    duration: "16 semaines",
-    level: "Avancé",
-    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600",
-    features: ["Neural Networks", "TensorFlow", "NLP", "Computer Vision", "Reinforcement Learning", "Projet IA"],
-    isFree: false
-  }
-];
+interface FormationData {
+  id: number;
+  titre: string;
+  description: string;
+  prix: number;
+  categorie: string;
+  niveau: string;
+  typeCours: string;
+}
+
+// Données par défaut pour l'affichage (utilisé seulement si l'API échoue)
+const defaultFormations: Formation[] = [];
+
+// Features par défaut
+const defaultFeatures: Record<number, string[]> = {};
 
 const Formations: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const [formations, setFormations] = useState<Formation[]>(defaultFormations);
+  const [loading, setLoading] = useState(false);
 
-  // Vérifier si une formation est gratuite (prix = 0, Gratuit, ou 0 CFA)
-  const isFormationFree = (price: string, isFree: boolean): boolean => {
-    return isFree || price === 'Gratuit' || price === '0' || price === '0 CFA';
+  // Charger les formations depuis l'API
+  useEffect(() => {
+    const loadFormations = async () => {
+      try {
+        setLoading(true);
+        const response = await apiFormation.getFormations();
+        if (response && response.data) {
+          // Transformer les données de l'API
+          const formattedFormations: Formation[] = response.data.map((f: FormationData) => ({
+            id: f.id,
+            titre: f.titre,
+            description: f.description,
+            prix: f.prix,
+            categorie: f.categorie,
+            niveau: f.niveau,
+            typeCours: f.typeCours,
+            image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600'
+          }));
+          setFormations(formattedFormations);
+        }
+      } catch {
+        console.log('Utilisation des données par défaut');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFormations();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-purple-600 text-xl">Chargement des formations...</div>
+      </div>
+    );
+  }
+
+  // Vérifier si une formation est gratuite
+  const isFormationFree = (formation: Formation): boolean => {
+    return formation.typeCours === 'GRATUIT' || formation.prix === 0;
+  };
+
+  // Gérer l'ouverture du modal de paiement
+  const handleOpenPayment = (formation: Formation) => {
+    if (!isAuthenticated || !user) {
+      navigate('/login', { state: { from: { pathname: '/formations' } } });
+      return;
+    }
+    // Stocker la formation sélectionnée pour la page de paiement
+    localStorage.setItem('selectedFormation', JSON.stringify(formation));
+    navigate('/paiement', { state: { formation } });
   };
 
   // Gérer l'inscription à une formation gratuite
   const handleFreeEnrollment = (formation: Formation): void => {
     if (!isAuthenticated || !user) {
-      // Rediriger vers la page de connexion avec l'URL de retour
-      navigate('/login', { state: { from: { pathname: `/formations` }, formationId: formation.id } });
+      navigate('/login', { state: { from: { pathname: '/formations' }, formationId: formation.id } });
       return;
     }
 
-    // Vérifier si l'utilisateur est déjà inscrit à cette formation
+    // Vérifier si déjà inscrit
     const inscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
     const dejaInscrit = inscriptions.some(
       (inscription: { coursId: number; utilisateurId: number }) => 
@@ -121,39 +107,38 @@ const Formations: React.FC = () => {
     );
 
     if (dejaInscrit) {
-      // Rediriger directement vers le dashboard
       navigate('/apprenant');
       return;
     }
 
-    // Simuler l'inscription dans localStorage
+    // Sauvegarder l'inscription
     const inscription = {
       id: `${formation.id}-${user.id}`,
       coursId: formation.id,
       utilisateurId: user.id,
       dateInscription: new Date().toISOString(),
-      coursTitre: formation.title
+      coursTitre: formation.titre
     };
-
-    // Sauvegarder dans localStorage
     inscriptions.push(inscription);
     localStorage.setItem('inscriptions', JSON.stringify(inscriptions));
 
     console.log('Inscription créée (gratuit):', inscription);
-
-    // Rediriger vers le dashboard
     navigate('/apprenant');
   };
 
-  const freeFormations = formationsData.filter(f => isFormationFree(f.price, f.isFree));
-  const paidFormations = formationsData.filter(f => !f.isFree);
+  const freeFormations = formations.filter(f => isFormationFree(f));
+  const paidFormations = formations.filter(f => !isFormationFree(f));
+
+  const getFeatures = (formationId: number): string[] => {
+    return defaultFeatures[formationId] || ['Formation professionnelle', 'Certification incluse', 'Support adapté'];
+  };
 
   return (
     <div className="w-screen h-screen bg-gray-50">
       <Header />
       
       {/* Hero Section */}
-     <section className="relative h-4/5 flex items-center overflow-hidden">
+      <section className="relative h-4/5 flex items-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
             src="/groupe.jpg" 
@@ -171,15 +156,7 @@ const Formations: React.FC = () => {
             <p className="text-gray-100 mb-10 text-lg font-light leading-relaxed max-w-md">
               Apprenez, évoluez et surtout pratiquez.
             </p>
-            <div className="flex flex-wrap gap-4">
-             
-            </div>
           </div>
-        </div>
-        
-        {/* Optionnel : L'élément graphique violet sur le laptop si vous l'avez en image */}
-        <div className="absolute bottom-20 right-20 hidden lg:block opacity-80">
-            {/* Insérez ici l'image de l'engrenage violet si disponible */}
         </div>
       </section>
 
@@ -194,36 +171,39 @@ const Formations: React.FC = () => {
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {freeFormations.map((formation) => (
-              <div key={formation.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                <div className="relative h-48">
+              <div key={formation.id} className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2 border border-green-100">
+                <div className="relative h-56">
                   <img 
-                    src={formation.image} 
-                    alt={formation.title}
+                    src={formation.image || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600'} 
+                    alt={formation.titre}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  <div className="absolute top-4 right-4 bg-green-500 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
                     Gratuit
                   </div>
                 </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-4 mb-3 text-sm text-gray-500">
-                    <span>{formation.duration}</span>
+                <div className="p-7">
+                  <div className="flex items-center gap-3 mb-3 text-sm text-gray-500">
+                    <span className="bg-green-50 px-2 py-1 rounded-md">{formation.niveau}</span>
                     <span>•</span>
-                    <span>{formation.level}</span>
+                    <span className="text-purple-600 font-medium">{formation.categorie}</span>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-3">{formation.title}</h3>
-                  <p className="text-gray-600 mb-4">{formation.description}</p>
+                  <h3 className="text-xl font-bold text-gray-800 mb-3">{formation.titre}</h3>
+                  <p className="text-gray-600 mb-5 line-clamp-2">{formation.description}</p>
                   <ul className="space-y-2 mb-6">
-                    {formation.features.slice(0, 4).map((feature, idx) => (
+                    {getFeatures(formation.id).slice(0, 4).map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                        <Check className="w-4 h-4 text-green-500" />
+                        <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-green-500" />
+                        </div>
                         {feature}
                       </li>
                     ))}
                   </ul>
                   <button 
                     onClick={() => handleFreeEnrollment(formation)}
-                    className="w-full bg-green-500 text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition cursor-pointer"
+                    className="w-full bg-green-500 text-white py-4 rounded-xl font-semibold hover:bg-green-600 transition cursor-pointer shadow-lg hover:shadow-xl"
                   >
                     Commencer la formation
                   </button>
@@ -245,38 +225,57 @@ const Formations: React.FC = () => {
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {paidFormations.map((formation) => (
-              <div key={formation.id} className="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-purple-100 hover:border-purple-300 transition-colors">
-                <div className="relative h-48">
+              <div key={formation.id} className="bg-white rounded-3xl shadow-lg overflow-hidden border-2 border-purple-100 hover:border-purple-400 hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-2">
+                <div className="relative h-56">
                   <img 
-                    src={formation.image} 
-                    alt={formation.title}
+                    src={formation.image || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600'} 
+                    alt={formation.titre}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute top-4 right-4 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
-                    {formation.price}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
+                  <div className="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
+                    {formation.prix.toLocaleString()} CFA
+                  </div>
+                  <div className="absolute bottom-4 left-4">
+                    <span className="bg-white/90 backdrop-blur-sm text-purple-700 px-3 py-1 rounded-md text-sm font-medium">
+                      {formation.categorie}
+                    </span>
                   </div>
                 </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-4 mb-3 text-sm text-gray-500">
-                    <span>{formation.duration}</span>
-                    <span>•</span>
-                    <span>{formation.level}</span>
+                <div className="p-7">
+                  <div className="flex items-center gap-3 mb-3 text-sm text-gray-500">
+                    <span className="bg-purple-50 px-2 py-1 rounded-md text-purple-600 font-medium">{formation.niveau}</span>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-3">{formation.title}</h3>
-                  <p className="text-gray-600 mb-4">{formation.description}</p>
+                  <h3 className="text-xl font-bold text-gray-800 mb-3">{formation.titre}</h3>
+                  <p className="text-gray-600 mb-5 line-clamp-2">{formation.description}</p>
                   <ul className="space-y-2 mb-6">
-                    {formation.features.map((feature, idx) => (
+                    {getFeatures(formation.id).map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
-                        <Check className="w-4 h-4 text-purple-500" />
+                        <div className="w-5 h-5 rounded-full bg-purple-50 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-purple-600" />
+                        </div>
                         {feature}
                       </li>
                     ))}
                   </ul>
+                  
+                  {/* Prix et bouton payer */}
+                  <div className="mb-4">
+                    <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">{formation.prix.toLocaleString()} CFA</div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => handleOpenPayment(formation)}
+                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                  >
+                    Payer maintenant
+                  </button>
+                  
                   <button 
                     onClick={() => navigate(`/formation/${formation.id}`)}
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer"
+                    className="w-full mt-3 border-2 border-purple-200 text-purple-600 py-3 rounded-xl font-semibold hover:bg-purple-50 transition cursor-pointer"
                   >
-                    S'inscrire maintenant
+                    Voir les détails
                   </button>
                 </div>
               </div>
@@ -288,9 +287,7 @@ const Formations: React.FC = () => {
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="container mx-auto px-6 text-center">
-          <p className="text-gray-400">
-            © 2024 GOLEARN. Tous droits réservés.
-          </p>
+          <p className="text-gray-400">© 2026 GoLearn. Tous droits réservés.</p>
         </div>
       </footer>
     </div>

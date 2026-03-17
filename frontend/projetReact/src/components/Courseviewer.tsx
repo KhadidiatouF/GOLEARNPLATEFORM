@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,58 @@ interface VideoContentProps { content: { videoUrl: string; description: string }
 interface PdfContentProps { content: { pdfUrl: string; description: string }; title: string; }
 interface QuizQuestion { id: number; question: string; options: string[]; correct: number; }
 interface QuizContentProps { content: { questions: QuizQuestion[] }; }
+
+interface ChapitreContent {
+  body?: string;
+  videoUrl?: string;
+  pdfUrl?: string;
+  description?: string;
+}
+
+interface Chapitre {
+  id: number;
+  title: string;
+  type: string;
+  duration: string;
+  completed: boolean;
+  locked: boolean;
+  content: ChapitreContent;
+  // Propriétés API (français)
+  titre?: string;
+  typeContenu?: string;
+  duree?: string;
+  contenu?: string;
+}
+
+interface Session {
+  id: number;
+  title: string;
+  type: string;
+  duration: string;
+  completed: boolean;
+  locked: boolean;
+  content: { body?: string; breadcrumb?: string[] };
+  chapitres?: Chapitre[];
+  // Propriétés API (français)
+  titre?: string;
+  duree?: string;
+  contenu?: string;
+}
+
+interface FormationData {
+  id: number;
+  title: string;
+  description: string;
+  progress: number;
+  sessions: Session[];
+  professor: {
+    name: string;
+    role: string;
+    specialty: string;
+    avatar: string;
+    verified: boolean;
+  };
+}
 
 const mockFormation = {
   id: 1,
@@ -203,14 +256,121 @@ function QuizContent({ content }: QuizContentProps) {
 
 interface CourseViewerProps { onBack: () => void; formationId?: number; }
 
-export default function CourseViewer({ onBack }: CourseViewerProps) {
-  const formation = mockFormation;
-  const [activeSessionId, setActiveSessionId] = useState(formation.sessions[0].id);
+export default function CourseViewer({ onBack, formationId }: CourseViewerProps) {
+  const location = useLocation();
+  
+  // État pour les données de la formation
+  const [formation, setFormation] = useState<FormationData>(mockFormation as unknown as FormationData);
+  const [loading, setLoading] = useState(true);
+  
+  // Charger la formation depuis l'API
+  useEffect(() => {
+    const loadFormation = async () => {
+      // Utiliser l'ID de la formation passé en prop ou depuis le state
+      const formationID = formationId || location.state?.formationId;
+      
+      if (!formationID) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`http://localhost:4004/formations/${formationID}`);
+        console.log('API Response status:', response.status);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('API Data:', JSON.stringify(data, null, 2));
+          // Transformer les données de l'API vers le format attendu
+          if (data.data) {
+            const formationData = data.data;
+            console.log('Formation sessions:', formationData.sessions);
+            
+            // Si pas de sessions, utiliser les données mock
+            if (!formationData.sessions || formationData.sessions.length === 0) {
+              console.log('API returned no sessions, using mock data');
+              setFormation(mockFormation as unknown as FormationData);
+            } else {
+              setFormation({
+                id: formationData.id,
+                title: formationData.titre,
+                description: formationData.description,
+                progress: 0,
+                sessions: (formationData.sessions || []).map((session: Record<string, unknown>, index: number) => ({
+                  id: Number(session.id) || (index + 1),
+                  title: String(session.titre || ''),
+                  type: 'article',
+                  duration: String(session.duree || '30 min'),
+                  completed: false,
+                  locked: index > 0,
+                  content: { body: String(session.contenu || 'Contenu en cours de rédaction...') },
+                  // Mapper les chapitres de la session
+                  chapitres: ((session.chapitres || []) as unknown as Chapitre[]).map((chapitre: Chapitre, chapIndex: number) => ({
+                    id: Number(chapitre.id) || (index * 100 + chapIndex + 1), // ID unique basé sur session + index
+                    title: String(chapitre.titre || ''),
+                    type: String(chapitre.typeContenu || 'TEXTE').toLowerCase(),
+                    duration: String(chapitre.duree || '15 min'),
+                    completed: false,
+                    locked: chapIndex > 0,
+                    content: { 
+                      body: String(chapitre.contenu || 'Contenu du chapitre...'),
+                      videoUrl: chapitre.typeContenu === 'VIDEO' ? 'https://www.youtube.com/embed/dQw4w9WgXcQ' : undefined,
+                      pdfUrl: chapitre.typeContenu === 'PDF' ? 'https://www.w3.org/WAI/WCAG21/Techniques/css/C12' : undefined,
+                      description: 'Description du chapitre'
+                    }
+                  }))
+                })),
+                professor: {
+                  name: formationData.professeur?.utilisateur?.nom + ' ' + formationData.professeur?.utilisateur?.prenom || 'Professeur',
+                  role: 'PROFESSEUR',
+                  specialty: formationData.professeur?.specialite || 'Formation',
+                  avatar: 'https://i.pravatar.cc/80?img=47',
+                  verified: true
+                }
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Erreur chargement formation:', error);
+        // En cas d'erreur, utiliser les données mock
+        console.log('Using mock data as fallback - API error');
+        setFormation(mockFormation as unknown as FormationData);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadFormation();
+  }, [formationId, location.state?.formationId]);
+  
+  const [activeSessionId, setActiveSessionId] = useState<number | undefined>(undefined);
 
 
 
-  const activeSession = formation.sessions.find((s) => s.id === activeSessionId);
-  const activeIndex = formation.sessions.findIndex((s) => s.id === activeSessionId);
+  // Afficher un chargement si nécessaire
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+  
+  if (!formation.sessions || formation.sessions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-center px-4">
+        <BookOpen size={60} className="text-gray-300 mb-4" />
+        <h2 className="text-xl font-semibold text-gray-600 mb-2">Aucun contenu disponible</h2>
+        <p className="text-gray-400 mb-6">Le contenu de cette formation est en cours de préparation.</p>
+        <button onClick={onBack} className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+          Retour aux formations
+        </button>
+      </div>
+    );
+  }
+
+  const activeSession = formation.sessions.find((s: { id: number }) => s.id === activeSessionId);
+  const activeIndex = formation.sessions.findIndex((s: { id: number }) => s.id === activeSessionId);
 
 
   const renderSessionContent = () => {
@@ -315,7 +475,7 @@ export default function CourseViewer({ onBack }: CourseViewerProps) {
           <div className="p-3 flex-1 overflow-y-auto">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-1">Sessions de la formation</p>
             <div className="space-y-1.5">
-              {formation.sessions.map((session) => (
+              {formation.sessions.map((session: { id: number; title: string; type: string; duration: string; completed: boolean; locked: boolean }) => (
                 <button key={session.id} onClick={() => !session.locked && setActiveSessionId(session.id)}
                   className={`w-full text-left px-3 py-3 rounded-xl transition-all ${
                     activeSessionId === session.id ? "bg-teal-50 border border-teal-200" :

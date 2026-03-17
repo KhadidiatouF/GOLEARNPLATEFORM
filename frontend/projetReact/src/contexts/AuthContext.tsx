@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import { apiAuth } from '../api/apiAuth';
 
 export type UserRole = 'admin' | 'prof' | 'apprenant';
 
@@ -7,33 +8,18 @@ interface User {
   email: string;
   name: string;
   role: UserRole;
+  professeurId?: number;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, role: UserRole) => boolean;
+  login: (login: string, password: string, role: UserRole) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock users pour la simulation
-const MOCK_USERS: Record<string, { password: string; user: User }> = {
-  'admin@example.com': {
-    password: 'admin123',
-    user: { id: 1, email: 'admin@example.com', name: 'Administrateur', role: 'admin' }
-  },
-  'prof@example.com': {
-    password: 'prof123',
-    user: { id: 2, email: 'prof@example.com', name: 'Professeur Dupont', role: 'prof' }
-  },
-  'apprenant@example.com': {
-    password: 'apprenant123',
-    user: { id: 3, email: 'apprenant@example.com', name: 'Jean Martin', role: 'apprenant' }
-  }
-};
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -53,34 +39,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     return null;
   });
-  const loading = false;
+  const [loading, setLoading] = useState(false);
 
-  const login = (_email: string, _password: string, role: UserRole): boolean => {
-    // Simulation de connexion - on utilise l'email pour trouver le mock user
-    const email = _email.toLowerCase();
-    const mockUser = MOCK_USERS[email];
-    
-    if (mockUser && mockUser.password === _password) {
-      setUser(mockUser.user);
-      localStorage.setItem('user', JSON.stringify(mockUser.user));
-      return true;
+  const login = async (loginInput: string, password: string, _role: UserRole): Promise<boolean> => {
+    // Note: le rôle n'est plus nécessaire car l'API le retourne avec l'utilisateur
+    void _role; // Empêche l'erreur ESLint si le paramètre doit être utilisé ailleurs
+    setLoading(true);
+    try {
+      // Appel à l'API backend pour l'authentification
+      const result = await apiAuth.login(loginInput, password);
+      
+      if (result.success && result.data?.tokens?.user) {
+        const userData = result.data.tokens.user;
+        // Convertir le rôle API vers le type UserRole
+        const userRole: UserRole = userData.role === 'ADMIN' ? 'admin' : userData.role === 'PROF' ? 'prof' : 'apprenant';
+        
+        const authenticatedUser: User = {
+          id: userData.id,
+          email: userData.email,
+          name: `${userData.prenom} ${userData.nom}`,
+          role: userRole,
+          professeurId: userData.professeurId
+        };
+        
+        setUser(authenticatedUser);
+        localStorage.setItem('user', JSON.stringify(authenticatedUser));
+        setLoading(false);
+        return true;
+      } else {
+        // Échec de l'authentification
+        setLoading(false);
+        return false;
+      }
+    } catch (error) {
+      console.error('Erreur lors de la connexion:', error);
+      setLoading(false);
+      return false;
     }
-    
-    // Si pas dans mock, créer un utilisateur temporaire basé sur le rôle
-    const tempUser: User = {
-      id: Date.now(),
-      email: _email,
-      name: _email.split('@')[0],
-      role
-    };
-    setUser(tempUser);
-    localStorage.setItem('user', JSON.stringify(tempUser));
-    return true;
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
   };
 
   return (

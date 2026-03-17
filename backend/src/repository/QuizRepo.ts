@@ -17,6 +17,43 @@ export class QuizRepo implements IRepository<Quiz> {
         });
     }
 
+    // Trouver tous les quiz d'une formation
+    async findByFormationId(formationId: number): Promise<Quiz[]> {
+        return await this.prisma.quiz.findMany({
+            where: { formationId },
+            include: { session: true, questions: { include: { reponses: true } } }
+        });
+    }
+
+    // Trouver le quiz par session
+    async findBySessionId(sessionId: number): Promise<Quiz | null> {
+        return await this.prisma.quiz.findFirst({
+            where: { sessionId },
+            include: { formation: true, session: true, questions: { include: { reponses: true } } }
+        });
+    }
+
+    // Trouver les quiz d'une formation avec leurs questions et réponses
+    async findByFormationIdWithDetails(formationId: number): Promise<any[]> {
+        return await this.prisma.quiz.findMany({
+            where: { formationId },
+            include: { 
+                session: true, 
+                questions: { 
+                    include: { reponses: true } 
+                } 
+            }
+        });
+    }
+
+    // Mettre à jour le score d'un quiz
+    async updateScore(id: number, score: number): Promise<Quiz> {
+        return await this.prisma.quiz.update({
+            where: { id },
+            data: { score }
+        });
+    }
+
     async create(data: Omit<Quiz, "id">): Promise<Quiz> {
         return await this.prisma.quiz.create({ data });
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { apiCertif } from '../api/apiCertif';
 import DashboardHeader from '../components/DashboardHeader';
 import Certificate from '../components/Certificate';
 import CourseViewer from '../components/Courseviewer';
@@ -14,10 +15,13 @@ interface MenuItem {
 }
 
 interface CertificateData {
-  id: string;
-  name: string;
-  date: string;
-  instructor: string;
+  id: number;
+  apprenantId: number;
+  formationId: number;
+  dateObtention: string;
+  formation?: {
+    titre: string;
+  };
 }
 
 interface EnrolledFormation {
@@ -30,14 +34,8 @@ interface EnrolledFormation {
   progress: number;
 }
 
-const formationsData: EnrolledFormation[] = [
-  { id: 1, title: 'Développement Web Complet', professor: 'Pr. Martin', duration: '12 semaines', image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600', dateInscription: '', progress: 0 },
-  { id: 2, title: 'Introduction à la Programmation', professor: 'Pr. Dupont', duration: '6 semaines', image: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600', dateInscription: '', progress: 0 },
-  { id: 3, title: 'Marketing Digital', professor: 'Pr. Martin', duration: '6 semaines', image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=600', dateInscription: '', progress: 0 },
-  { id: 4, title: 'Data Science avec Python', professor: 'Pr. Dupont', duration: '10 semaines', image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600', dateInscription: '', progress: 0 },
-  { id: 5, title: 'UX/UI Design Professionnel', professor: 'Pr. Martin', duration: '8 semaines', image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600', dateInscription: '', progress: 0 },
-  { id: 6, title: 'Cybersécurité', professor: 'Pr. Dupont', duration: '14 semaines', image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600', dateInscription: '', progress: 0 },
-];
+// Les données d formations seront chargées depuis localStorage (inscriptions)
+// const _formationsData = [];
 
 const menuItems: MenuItem[] = [
   {
@@ -62,11 +60,7 @@ const menuItems: MenuItem[] = [
   }
 ];
 
-const mockCertificates: CertificateData[] = [
-  { id: '1', name: 'HTML & CSS Basics', date: '15 Jan 2024', instructor: 'Marie Dupont' },
-  { id: '2', name: 'JavaScript Fundamentals', date: '20 Fév 2024', instructor: 'Jean Martin' },
-  { id: '3', name: 'React.js Complete Course', date: '15 Mar 2024', instructor: 'Sophie Bernard' }
-];
+// Les certifications seront chargées depuis localStorage
 
 export default function ApprenantDashboard() {
   const { user, logout } = useAuth();
@@ -87,6 +81,32 @@ export default function ApprenantDashboard() {
   const certificatsPerPage = 6;
   const [autoDownload, setAutoDownload] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // État pour les certifications depuis l'API
+  const [certifications, setCertifications] = useState<CertificateData[]>([]);
+  const [certificationsLoading, setCertificationsLoading] = useState(true);
+  
+  // Charger les certifications depuis l'API
+  useEffect(() => {
+    const loadCertifications = async () => {
+      try {
+        setCertificationsLoading(true);
+        const response = await apiCertif.getCertifications();
+        if (response && response.data) {
+          setCertifications(response.data);
+        }
+      } catch (error) {
+        console.error('Erreur chargement certifications:', error);
+        // Fallback vers localStorage
+        const storedCerts = JSON.parse(localStorage.getItem('certifications') || '[]');
+        setCertifications(storedCerts);
+      } finally {
+        setCertificationsLoading(false);
+      }
+    };
+    
+    loadCertifications();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -262,11 +282,23 @@ export default function ApprenantDashboard() {
               const userInscriptions = storedInscriptions.filter(
                 (inscription: { utilisateurId: number }) => user && inscription.utilisateurId === user.id
               );
-              const allFormations = userInscriptions.map((inscription: { coursId: number; coursTitre: string; dateInscription: string }) => {
-                const formationInfo = formationsData.find(f => f.id === inscription.coursId) || { professor: 'Pr. à confirmer', duration: 'À définir', image: '' };
-                return { id: inscription.coursId, title: inscription.coursTitre, professor: formationInfo.professor, duration: formationInfo.duration, image: formationInfo.image, dateInscription: inscription.dateInscription, progress: 0 };
+              const allFormations = userInscriptions.map((inscription: { coursId: number; coursTitre: string; dateInscription: string }, index: number) => {
+                return { 
+                  id: inscription.coursId, 
+                  uniqueKey: `${inscription.coursId}-${index}`, // Clé unique pour React
+                  title: inscription.coursTitre, 
+                  professor: 'Professeur',
+                  duration: 'À définir',
+                  image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600',
+                  dateInscription: inscription.dateInscription, 
+                  progress: 0 
+                };
               });
-              const filteredFormations = allFormations.filter((formation: EnrolledFormation) => {
+              // Supprimer les doublons basée sur coursId
+              const uniqueFormations = allFormations.filter((formation: EnrolledFormation & { uniqueKey: string }, index: number, self: (EnrolledFormation & { uniqueKey: string })[]) => 
+                index === self.findIndex((f: EnrolledFormation & { uniqueKey: string }) => f.id === formation.id)
+              );
+              const filteredFormations = uniqueFormations.filter((formation: EnrolledFormation) => {
                 const matchesSearch = formation.title.toLowerCase().includes(formationSearch.toLowerCase());
                 const matchesProf = !formationFilterProf || formation.professor === formationFilterProf;
                 return matchesSearch && matchesProf;
@@ -357,13 +389,23 @@ export default function ApprenantDashboard() {
               </div>
             </div>
             {(() => {
-              const filteredCerts = mockCertificates.filter(cert => cert.name.toLowerCase().includes(certificatSearch.toLowerCase()));
+              // Utiliser les certifications depuis l'API (afficher toutes pour le moment)
+              // Afficher un indicateur de chargement si nécessaire
+              if (certificationsLoading) {
+                return (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  </div>
+                );
+              }
+              
+              const filteredCerts = certifications.filter((cert) => cert.formation?.titre && cert.formation?.titre.toLowerCase().includes(certificatSearch.toLowerCase()));
               const totalPages = Math.ceil(filteredCerts.length / certificatsPerPage);
               const paginatedCerts = filteredCerts.slice((certificatPage - 1) * certificatsPerPage, certificatPage * certificatsPerPage);
               return (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {paginatedCerts.map((cert) => (
+                    {paginatedCerts.map((cert: CertificateData) => (
                       <div key={cert.id} className="relative overflow-hidden bg-gradient-to-br from-yellow-50 to-amber-100 rounded-xl p-5 border border-yellow-200 hover:shadow-lg transition-shadow">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-200 rounded-full -mr-8 -mt-8 opacity-50"></div>
                         <div className="flex items-center gap-4">
@@ -371,10 +413,10 @@ export default function ApprenantDashboard() {
                             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
                           </div>
                           <div className="flex-1">
-                            <p className="font-bold text-gray-800">{cert.name}</p>
+                            <p className="font-bold text-gray-800">{cert.formation?.titre || 'Certification'}</p>
                             <p className="text-sm text-gray-500 flex items-center gap-1">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                              {cert.date}
+                              {cert.dateObtention ? new Date(cert.dateObtention).toLocaleDateString('fr-FR') : ''}
                             </p>
                           </div>
                         </div>
@@ -506,9 +548,9 @@ export default function ApprenantDashboard() {
 
       {selectedCertificate && (
         <Certificate
-          courseName={selectedCertificate.name}
-          completionDate={selectedCertificate.date}
-          instructor={selectedCertificate.instructor}
+          courseName={selectedCertificate?.formation?.titre || ''}
+          completionDate={selectedCertificate?.dateObtention ? new Date(selectedCertificate.dateObtention).toLocaleDateString('fr-FR') : ''}
+          instructor="Golearn"
           onClose={handleCloseCertificate}
           autoDownload={autoDownload}
         />

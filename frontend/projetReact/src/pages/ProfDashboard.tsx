@@ -3,17 +3,40 @@ import { useAuth } from '../contexts/AuthContext';
 import DashboardHeader from '../components/DashboardHeader';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { apiFormation } from '../api/apiFormation';
 import { BookOpen, Users, Calendar, Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+
+// Types pour la création complète de formation
+
+
+interface Chapitre {
+  titre: string;
+  contenu: string;
+  duree: string;
+  typeContenu: 'VIDEO' | 'PDF' | 'TEXTE';
+}
+
+interface Session {
+  titre: string;
+  contenu?: string;
+  duree?: string;
+  chapitres: Chapitre[];
+}
 
 interface Course {
   id: number;
-  title: string;
+  titre: string;
   description: string;
+  prix: number;
+  categorie: string;
+  niveau: string;
+  image?: string;
+  typeCours: 'PAYANT' | 'GRATUIT';
   students: number;
   modules: number;
-  type: 'payant' | 'gratuit';
   status: 'pending' | 'validated' | 'rejected';
   color: string;
+  professeurId: number;
 }
 
 type TabType = 'dashboard' | 'formations' | 'apprenants' | 'travaux' | 'parametres';
@@ -79,15 +102,28 @@ export default function ProfDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [courses, setCourses] = useState<Course[]>([
-    { id: 1, title: 'Introduction à React', description: 'Apprenez les bases de React', students: 45, modules: 12, type: 'payant', status: 'validated', color: 'from-blue-500 to-blue-700' },
-    { id: 2, title: 'JavaScript Avancé', description: 'Maîtrisez JavaScript', students: 32, modules: 8, type: 'gratuit', status: 'validated', color: 'from-green-500 to-green-700' },
-    { id: 3, title: 'TypeScript Fundamentals', description: 'Introduction à TypeScript', students: 28, modules: 10, type: 'payant', status: 'pending', color: 'from-purple-500 to-purple-700' },
-    { id: 4, title: 'Node.js Backend', description: 'Créez des API avec Node.js', students: 20, modules: 15, type: 'gratuit', status: 'pending', color: 'from-orange-500 to-orange-700' },
+    { id: 1, titre: 'Introduction à React', description: 'Apprenez les bases de React', prix: 25000, categorie: 'Développement Web', niveau: 'Débutant', typeCours: 'PAYANT', students: 45, modules: 12, status: 'validated', color: 'from-blue-500 to-blue-700', professeurId: 1 },
+    { id: 2, titre: 'JavaScript Avancé', description: 'Maîtrisez JavaScript', prix: 0, categorie: 'Développement Web', niveau: 'Avancé', typeCours: 'GRATUIT', students: 32, modules: 8, status: 'validated', color: 'from-green-500 to-green-700', professeurId: 1 },
+    { id: 3, titre: 'TypeScript Fundamentals', description: 'Introduction à TypeScript', prix: 30000, categorie: 'Développement Web', niveau: 'Intermédiaire', typeCours: 'PAYANT', students: 28, modules: 10, status: 'pending', color: 'from-purple-500 to-purple-700', professeurId: 1 },
+    { id: 4, titre: 'Node.js Backend', description: 'Créez des API avec Node.js', prix: 0, categorie: 'Développement Web', niveau: 'Intermédiaire', typeCours: 'GRATUIT', students: 20, modules: 15, status: 'pending', color: 'from-orange-500 to-orange-700', professeurId: 1 },
   ]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<number | null>(null);
-  const [newCourse, setNewCourse] = useState({ title: '', description: '', modules: 0, type: 'gratuit' as 'payant' | 'gratuit' });
+  const [newCourse, setNewCourse] = useState({
+    titre: '',
+    description: '',
+    prix: 0,
+    categorie: '',
+    niveau: '',
+    typeCours: 'GRATUIT' as 'PAYANT' | 'GRATUIT',
+    image: '',
+    sessions: [{ titre: '', chapitres: [] }] as Session[]
+  });
+  
+  // Gestion des erreurs du formulaire
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [submitStatus, setSubmitStatus] = useState<{ type: 'success' | 'error' | null; message: string }>({ type: null, message: '' });
 
   // Pagination et filtration pour les formations
   const [formationSearch, setFormationSearch] = useState('');
@@ -101,20 +137,124 @@ export default function ProfDashboard() {
   const [apprenantPage, setApprenantPage] = useState(1);
   const apprenantsPerPage = 10;
 
-  const handleAddCourse = () => {
-    const course: Course = {
-      id: Date.now(),
-      title: newCourse.title,
-      description: newCourse.description,
-      students: 0,
-      modules: newCourse.modules,
-      type: newCourse.type,
-      status: 'pending', // En attente de validation admin
-      color: 'from-indigo-500 to-indigo-700',
-    };
-    setCourses([course, ...courses]);
-    setIsModalOpen(false);
-    setNewCourse({ title: '', description: '', modules: 0, type: 'gratuit' });
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    if (!newCourse.titre.trim()) {
+      errors.titre = 'Le titre est requis';
+    } else if (newCourse.titre.trim().length < 2) {
+      errors.titre = 'Le titre doit contenir au moins 2 caractères';
+    }
+    
+    if (!newCourse.description.trim()) {
+      errors.description = 'La description est requise';
+    } else if (newCourse.description.trim().length < 10) {
+      errors.description = 'La description doit contenir au moins 10 caractères';
+    }
+    
+    if (!newCourse.categorie) {
+      errors.categorie = 'La catégorie est requise';
+    }
+    
+    if (!newCourse.niveau) {
+      errors.niveau = 'Le niveau est requis';
+    }
+    
+    // Prix requis uniquement pour les formations payantes
+    if (newCourse.typeCours === 'PAYANT' && (!newCourse.prix || newCourse.prix <= 0)) {
+      errors.prix = 'Le prix est requis pour une formation payante';
+    }
+    
+    // Validation des sessions (au moins une session requise)
+    if (!newCourse.sessions || newCourse.sessions.length === 0) {
+      errors.sessions = 'Au moins une session est requise';
+    } else {
+      newCourse.sessions.forEach((session, index) => {
+        if (!session.titre.trim()) {
+          errors[`session_${index}`] = `Le titre de la session ${index + 1} est requis`;
+        }
+      });
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleAddCourse = async () => {
+    // Réinitialiser les erreurs et le statut
+    setFormErrors({});
+    setSubmitStatus({ type: null, message: '' });
+    
+    // Valider le formulaire
+    if (!validateForm()) {
+      return;
+    }
+    
+    try {
+      // Récupérer le professeurId depuis le contexte d'authentification
+      const professeurId = user?.professeurId || user?.id;
+      
+      if (!professeurId) {
+        setSubmitStatus({ type: 'error', message: 'Erreur: Impossible de récupérer votre identifiant de professeur' });
+        return;
+      }
+
+      // Préparer les données conformes au backend (création complète avec sessions)
+      const formationData = {
+        titre: newCourse.titre.trim(),
+        description: newCourse.description.trim(),
+        prix: newCourse.typeCours === 'GRATUIT' ? 0 : Number(newCourse.prix),
+        categorie: newCourse.categorie,
+        niveau: newCourse.niveau,
+        typeCours: newCourse.typeCours,
+        image: newCourse.image?.trim() || undefined,
+        professeurId: professeurId,
+        sessions: newCourse.sessions.filter(s => s.titre.trim()).map(session => ({
+          titre: session.titre,
+          contenu: session.contenu || '',
+          duree: session.duree || '',
+          chapitres: session.chapitres.filter(c => c.titre.trim())
+        }))
+      };
+
+      // Appeler l'API backend pour création complète
+      const response = await apiFormation.createCompleteFormation(formationData);
+      
+      if (response.status === 201 || response.success) {
+        // Ajouter la formation à l'état local après création réussie
+        const course: Course = {
+          id: response.data?.id || Date.now(),
+          titre: newCourse.titre,
+          description: newCourse.description,
+          prix: formationData.prix,
+          categorie: newCourse.categorie,
+          niveau: newCourse.niveau,
+          typeCours: newCourse.typeCours,
+          image: newCourse.image,
+          students: 0,
+          modules: 0,
+          status: 'pending',
+          color: 'from-indigo-500 to-indigo-700',
+          professeurId: professeurId
+        };
+        setCourses([course, ...courses]);
+        setIsModalOpen(false);
+        setNewCourse({
+          titre: '',
+          description: '',
+          prix: 0,
+          categorie: '',
+          niveau: '',
+          typeCours: 'GRATUIT',
+          image: '',
+          sessions: [{ titre: '', chapitres: [] }]
+        });
+        setSubmitStatus({ type: 'success', message: 'Formation créée avec succès! En attente de validation.' });
+      }
+    } catch (error) {
+      console.error('Erreur lors de la création de la formation:', error);
+      setSubmitStatus({ type: 'error', message: 'Erreur lors de la création de la formation. Veuillez réessayer.' });
+    }
   };
 
   const handleDeleteCourse = () => {
@@ -364,7 +504,7 @@ export default function ProfDashboard() {
               {/* Formations filtrées */}
               {(() => {
                 const filteredCourses = courses.filter(course => {
-                  const matchesSearch = course.title.toLowerCase().includes(formationSearch.toLowerCase());
+                  const matchesSearch = course.titre.toLowerCase().includes(formationSearch.toLowerCase());
                   const matchesStatus = !formationFilterStatus || course.status === formationFilterStatus;
                   return matchesSearch && matchesStatus;
                 });
@@ -405,13 +545,13 @@ export default function ProfDashboard() {
                             </div>
                           </div>
                           
-                          <h3 className="font-bold text-lg mb-1">{course.title}</h3>
+                          <h3 className="font-bold text-lg mb-1">{course.titre}</h3>
                           <p className="text-white/80 text-sm mb-3">{course.description}</p>
                           <div className="flex items-center gap-3">
                             <span className="px-2 py-1 bg-white/20 rounded text-xs">{course.students} apprenants</span>
                             <span className="px-2 py-1 bg-white/20 rounded text-xs">{course.modules} modules</span>
-                            <span className={`px-2 py-1 rounded text-xs ${course.type === 'payant' ? 'bg-yellow-400 text-yellow-900' : 'bg-green-400 text-green-900'}`}>
-                              {course.type === 'payant' ? 'Payant' : 'Gratuit'}
+                            <span className={`px-2 py-1 rounded text-xs ${course.typeCours === 'PAYANT' ? 'bg-yellow-400 text-yellow-900' : 'bg-green-400 text-green-900'}`}>
+                              {course.typeCours === 'PAYANT' ? 'Payant' : 'Gratuit'}
                             </span>
                           </div>
                         </div>
@@ -458,48 +598,250 @@ export default function ProfDashboard() {
             >
               <form onSubmit={(e) => { e.preventDefault(); handleAddCourse(); }} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Titre de la formation</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Titre de la formation *</label>
                   <input
                     type="text"
-                    value={newCourse.title}
-                    onChange={(e) => setNewCourse({ ...newCourse, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    value={newCourse.titre}
+                    onChange={(e) => {
+                      setNewCourse({ ...newCourse, titre: e.target.value });
+                      if (formErrors.titre) setFormErrors({ ...formErrors, titre: '' });
+                    }}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${formErrors.titre ? 'border-red-500' : 'border-gray-300'}`}
                     placeholder="Ex: React Avancé"
-                    required
                   />
+                  {formErrors.titre && <p className="text-red-500 text-sm mt-1">{formErrors.titre}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
                   <textarea
                     value={newCourse.description}
-                    onChange={(e) => setNewCourse({ ...newCourse, description: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    onChange={(e) => {
+                      setNewCourse({ ...newCourse, description: e.target.value });
+                      if (formErrors.description) setFormErrors({ ...formErrors, description: '' });
+                    }}
+                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${formErrors.description ? 'border-red-500' : 'border-gray-300'}`}
                     placeholder="Décrivez votre formation..."
                     rows={3}
-                    required
                   />
+                  {formErrors.description && <p className="text-red-500 text-sm mt-1">{formErrors.description}</p>}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prix (FCFA) {newCourse.typeCours === 'GRATUIT' ? '(Gratuit)' : '*'}
+                    </label>
+                    <input
+                      type="number"
+                      value={newCourse.prix || ''}
+                      onChange={(e) => {
+                        setNewCourse({ ...newCourse, prix: parseFloat(e.target.value) || 0 });
+                        if (formErrors.prix) setFormErrors({ ...formErrors, prix: '' });
+                      }}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${formErrors.prix ? 'border-red-500' : 'border-gray-300'}`}
+                      placeholder={newCourse.typeCours === 'GRATUIT' ? 'Non requis' : 'Ex: 25000'}
+                      min="0"
+                      step="100"
+                      disabled={newCourse.typeCours === 'GRATUIT'}
+                    />
+                    {formErrors.prix && <p className="text-red-500 text-sm mt-1">{formErrors.prix}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie *</label>
+                    <select
+                      value={newCourse.categorie}
+                      onChange={(e) => {
+                        setNewCourse({ ...newCourse, categorie: e.target.value });
+                        if (formErrors.categorie) setFormErrors({ ...formErrors, categorie: '' });
+                      }}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${formErrors.categorie ? 'border-red-500' : 'border-gray-300'}`}
+                    >
+                      <option value="">Sélectionner une catégorie</option>
+                      <option value="Développement Web">Développement Web</option>
+                      <option value="Développement Mobile">Développement Mobile</option>
+                      <option value="Data Science">Data Science</option>
+                      <option value="Intelligence Artificielle">Intelligence Artificielle</option>
+                      <option value="Design">Design</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Business">Business</option>
+                      <option value="Langues">Langues</option>
+                      <option value="Autre">Autre</option>
+                    </select>
+                    {formErrors.categorie && <p className="text-red-500 text-sm mt-1">{formErrors.categorie}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Niveau *</label>
+                    <select
+                      value={newCourse.niveau}
+                      onChange={(e) => {
+                        setNewCourse({ ...newCourse, niveau: e.target.value });
+                        if (formErrors.niveau) setFormErrors({ ...formErrors, niveau: '' });
+                      }}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${formErrors.niveau ? 'border-red-500' : 'border-gray-300'}`}
+                    >
+                      <option value="">Sélectionner un niveau</option>
+                      <option value="Débutant">Débutant</option>
+                      <option value="Intermédiaire">Intermédiaire</option>
+                      <option value="Avancé">Avancé</option>
+                      <option value="Tous niveaux">Tous niveaux</option>
+                    </select>
+                    {formErrors.niveau && <p className="text-red-500 text-sm mt-1">{formErrors.niveau}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type de formation *</label>
+                    <select
+                      value={newCourse.typeCours}
+                      onChange={(e) => setNewCourse({ ...newCourse, typeCours: e.target.value as 'PAYANT' | 'GRATUIT' })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="GRATUIT">Gratuit</option>
+                      <option value="PAYANT">Payant</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de modules</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">URL de l'image (optionnel)</label>
                   <input
-                    type="number"
-                    value={newCourse.modules}
-                    onChange={(e) => setNewCourse({ ...newCourse, modules: parseInt(e.target.value) || 0 })}
+                    type="url"
+                    value={newCourse.image}
+                    onChange={(e) => setNewCourse({ ...newCourse, image: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    min="1"
-                    required
+                    placeholder="https://exemple.com/image.jpg"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type de formation</label>
-                  <select
-                    value={newCourse.type}
-                    onChange={(e) => setNewCourse({ ...newCourse, type: e.target.value as 'payant' | 'gratuit' })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  >
-                    <option value="gratuit">Gratuit</option>
-                    <option value="payant">Payant</option>
-                  </select>
+                
+                {/* Sections Sessions et Chapitres */}
+                <div className="border-t pt-4 mt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="block text-sm font-medium text-gray-700">Sessions / Modules *</label>
+                    <button
+                      type="button"
+                      onClick={() => setNewCourse({ ...newCourse, sessions: [...newCourse.sessions, { titre: '', chapitres: [] }] })}
+                      className="text-sm text-green-600 hover:text-green-700 flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" /> Ajouter une session
+                    </button>
+                  </div>
+                  
+                  {formErrors.sessions && <p className="text-red-500 text-sm mb-2">{formErrors.sessions}</p>}
+                  
+                  {newCourse.sessions.map((session, sessionIndex) => (
+                    <div key={sessionIndex} className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-700">Session {sessionIndex + 1}</span>
+                        {newCourse.sessions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedSessions = newCourse.sessions.filter((_, i) => i !== sessionIndex);
+                              setNewCourse({ ...newCourse, sessions: updatedSessions });
+                            }}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        value={session.titre}
+                        onChange={(e) => {
+                          const updatedSessions = [...newCourse.sessions];
+                          updatedSessions[sessionIndex].titre = e.target.value;
+                          setNewCourse({ ...newCourse, sessions: updatedSessions });
+                        }}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 mb-3 ${formErrors[`session_${sessionIndex}`] ? 'border-red-500' : 'border-gray-300'}`}
+                        placeholder="Titre de la session (ex: Introduction, Bases...)"
+                      />
+                      {formErrors[`session_${sessionIndex}`] && <p className="text-red-500 text-sm mb-2">{formErrors[`session_${sessionIndex}`]}</p>}
+                      
+                      {/* Chapitres de la session */}
+                      <div className="ml-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-gray-600">Chapitres</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedSessions = [...newCourse.sessions];
+                              updatedSessions[sessionIndex].chapitres.push({ titre: '', contenu: '', duree: '', typeContenu: 'VIDEO' });
+                              setNewCourse({ ...newCourse, sessions: updatedSessions });
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" /> Ajouter un chapitre
+                          </button>
+                        </div>
+                        
+                        {session.chapitres.map((chapitre, chapitreIndex) => (
+                          <div key={chapitreIndex} className="bg-white rounded border p-3 mb-2">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-gray-600">Chapitre {chapitreIndex + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedSessions = [...newCourse.sessions];
+                                  updatedSessions[sessionIndex].chapitres.splice(chapitreIndex, 1);
+                                  setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                }}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={chapitre.titre}
+                              onChange={(e) => {
+                                const updatedSessions = [...newCourse.sessions];
+                                updatedSessions[sessionIndex].chapitres[chapitreIndex].titre = e.target.value;
+                                setNewCourse({ ...newCourse, sessions: updatedSessions });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                              placeholder="Titre du chapitre"
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={chapitre.contenu}
+                                onChange={(e) => {
+                                  const updatedSessions = [...newCourse.sessions];
+                                  updatedSessions[sessionIndex].chapitres[chapitreIndex].contenu = e.target.value;
+                                  setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                }}
+                                className="px-3 py-2 border border-gray-300 rounded text-sm"
+                                placeholder="Contenu/Description"
+                              />
+                              <input
+                                type="text"
+                                value={chapitre.duree}
+                                onChange={(e) => {
+                                  const updatedSessions = [...newCourse.sessions];
+                                  updatedSessions[sessionIndex].chapitres[chapitreIndex].duree = e.target.value;
+                                  setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                }}
+                                className="px-3 py-2 border border-gray-300 rounded text-sm"
+                                placeholder="Durée (ex: 10min)"
+                              />
+                            </div>
+                            <select
+                              value={chapitre.typeContenu}
+                              onChange={(e) => {
+                                const updatedSessions = [...newCourse.sessions];
+                                updatedSessions[sessionIndex].chapitres[chapitreIndex].typeContenu = e.target.value as 'VIDEO' | 'PDF' | 'TEXTE';
+                                setNewCourse({ ...newCourse, sessions: updatedSessions });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm mt-2"
+                            >
+                              <option value="VIDEO">Vidéo</option>
+                              <option value="PDF">PDF</option>
+                              <option value="TEXTE">Texte</option>
+                            </select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-sm text-yellow-800 flex items-center gap-2">
@@ -507,10 +849,19 @@ export default function ProfDashboard() {
                     Cette formation sera soumise à validation par l'administrateur avant d'être visible publiquement.
                   </p>
                 </div>
+                {submitStatus.message && (
+                  <div className={`p-4 rounded-lg ${submitStatus.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                    <p className="text-sm">{submitStatus.message}</p>
+                  </div>
+                )}
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => {
+                      setIsModalOpen(false);
+                      setFormErrors({});
+                      setSubmitStatus({ type: null, message: '' });
+                    }}
                     className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                   >
                     Annuler

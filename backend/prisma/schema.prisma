@@ -70,14 +70,27 @@ model Formation {
 model Session {
   id          Int         @id @default(autoincrement())
   titre       String
-  contenu     String
+  contenu     String?
   duree       String
-  typeContenu TypeContenu
+  chapitres   Chapitre[]
+  quiz        Quiz?
   formationId Int
-  quiz        Quiz[]
   formation   Formation   @relation(fields: [formationId], references: [id])
 
   @@index([formationId], map: "Session_formationId_fkey")
+}
+
+model Chapitre {
+  id          Int        @id @default(autoincrement())
+  titre       String
+  contenu     String
+  duree       String
+  typeContenu TypeContenu
+  ordre       Int        @default(0)
+  sessionId   Int
+  session     Session    @relation(fields: [sessionId], references: [id])
+
+  @@index([sessionId], map: "Chapitre_sessionId_fkey")
 }
 
 model Paiement {
@@ -117,7 +130,7 @@ model Quiz {
   id          Int        @id @default(autoincrement())
   score       Float?
   formationId Int
-  sessionId   Int
+  sessionId   Int        @unique
   questions   Question[]
   formation   Formation  @relation(fields: [formationId], references: [id])
   session     Session    @relation(fields: [sessionId], references: [id])

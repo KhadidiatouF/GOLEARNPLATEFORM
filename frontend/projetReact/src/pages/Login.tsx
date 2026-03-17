@@ -4,41 +4,34 @@ import { useAuth, type UserRole } from '../contexts/AuthContext';
 import './Login.css';
 
 interface LoginErrors {
-  email?: string;
+  loginInput?: string;
   password?: string;
   role?: string;
 }
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('apprenant');
+  const [loginInput, setLoginInput] = useState('');
+  const [mdp, setMdp] = useState('');
   const [errors, setErrors] = useState<LoginErrors>({});
   const [loginError, setLoginError] = useState('');
-  const { login } = useAuth();
+  const { login: authLogin } = useAuth();
   const navigate = useNavigate();
 
-  const validateEmail = (email: string): boolean => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-  };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoginError('');
     
     // Validation des champs
     const newErrors: LoginErrors = {};
     
-    if (!email) {
-      newErrors.email = "L'email est requis";
-    } else if (!validateEmail(email)) {
-      newErrors.email = 'Veuillez entrer un email valide';
+    if (!loginInput) {
+      newErrors.loginInput = 'Le login est requis';
     }
     
-    if (!password) {
+    if (!mdp) {
       newErrors.password = 'Le mot de passe est requis';
-    } else if (password.length < 6) {
+    } else if (mdp.length < 6) {
       newErrors.password = 'Le mot de passe doit contenir au moins 6 caractères';
     }
     
@@ -46,21 +39,34 @@ export default function Login() {
     
     // Si pas d'erreurs, soumettre le formulaire
     if (Object.keys(newErrors).length === 0) {
-      const success = login(email, password, role);
+      // Passer un rôle par défaut, l'API retournera le vrai rôle
+      const success = await authLogin(loginInput, mdp, 'apprenant');
       if (success) {
         setTimeout(() => {
-          // Redirection selon le profil
-          switch (role) {
-            case 'admin':
-              navigate('/admin');
-              break;
-            case 'prof':
-              navigate('/prof');
-              break;
-            case 'apprenant':
-            default:
+          // Lire le rôle depuis localStorage (mis à jour par AuthContext)
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            try {
+              const userData = JSON.parse(storedUser);
+              const userRole = userData.role;
+              switch (userRole) {
+                case 'admin':
+                  navigate('/admin');
+                  break;
+                case 'prof':
+                  navigate('/prof');
+                  break;
+                case 'apprenant':
+                default:
+                  navigate('/formations');
+                  break;
+              }
+            } catch {
+              // En cas d'erreur, redirection vers les formations
               navigate('/formations');
-              break;
+            }
+          } else {
+            navigate('/formations');
           }
         }, 300);
       } else {
@@ -75,10 +81,9 @@ export default function Login() {
     }, 300);
   };
 
-  const handleDemoLogin = (demoRole: UserRole, demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword(demoRole === 'admin' ? 'admin123' : demoRole === 'prof' ? 'prof123' : 'apprenant123');
-    setRole(demoRole);
+  const handleDemoLogin = (demoRole: UserRole, demoLogin: string) => {
+    setLoginInput(demoLogin);
+    setMdp(demoRole === 'admin' ? 'admin123' : demoRole === 'prof' ? '123456' : '123456');
   };
 
   return (
@@ -108,19 +113,19 @@ export default function Login() {
           
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label htmlFor="login" className="block text-sm font-medium text-gray-700 mb-1">Login</label>
               <input
-                type="email"
-                id="email"
-                value={email}
+                type="text"
+                id="login"
+                value={loginInput}
                 onChange={(e) => {
-                  setEmail(e.target.value);
-                  if (errors.email) setErrors({ ...errors, email: undefined });
+                  setLoginInput(e.target.value);
+                  if (errors.loginInput) setErrors({ ...errors, loginInput: undefined });
                 }}
-                placeholder="Votre email"
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Votre login"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${errors.loginInput ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+              {errors.loginInput && <p className="text-red-500 text-sm mt-1">{errors.loginInput}</p>}
             </div>
             
             <div className="mb-6">
@@ -128,9 +133,9 @@ export default function Login() {
               <input
                 type="password"
                 id="password"
-                value={password}
+                value={mdp}
                 onChange={(e) => {
-                  setPassword(e.target.value);
+                  setMdp(e.target.value);
                   if (errors.password) setErrors({ ...errors, password: undefined });
                 }}
                 placeholder="Votre mot de passe"
@@ -139,45 +144,7 @@ export default function Login() {
               {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Profil</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRole('apprenant')}
-                  className={`py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                    role === 'apprenant' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Apprenant
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('prof')}
-                  className={`py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                    role === 'prof' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Professeur
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole('admin')}
-                  className={`py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
-                    role === 'admin' 
-                      ? 'bg-purple-600 text-white' 
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  Admin
-                </button>
-              </div>
-            </div>
-            
+           
             <button
               type="submit"
               className="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-medium"
@@ -192,21 +159,21 @@ export default function Login() {
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => handleDemoLogin('apprenant', 'apprenant@example.com')}
+                onClick={() => handleDemoLogin('apprenant', 'student1')}
                 className="bg-blue-100 text-blue-700 py-2 px-2 md:px-3 rounded-lg text-xs hover:bg-blue-200 transition-colors"
               >
                 Apprenant
               </button>
               <button
                 type="button"
-                onClick={() => handleDemoLogin('prof', 'prof@example.com')}
+                onClick={() => handleDemoLogin('prof', 'prof1')}
                 className="bg-green-100 text-green-700 py-2 px-2 md:px-3 rounded-lg text-xs hover:bg-green-200 transition-colors"
               >
                 Prof
               </button>
               <button
                 type="button"
-                onClick={() => handleDemoLogin('admin', 'admin@example.com')}
+                onClick={() => handleDemoLogin('admin', 'admin')}
                 className="bg-red-100 text-red-700 py-2 px-2 md:px-3 rounded-lg text-xs hover:bg-red-200 transition-colors"
               >
                 Admin

@@ -117,26 +117,25 @@ const FormationDetail: React.FC = () => {
   };
 
   useEffect(() => {
-    // Données mock pour les 3 formations
+    // Données mock pour toutes les formations
     const mockCoursList: Cours[] = [
       {
         id: 1,
-        titre: 'Développement Web',
-        description: 'Apprenez HTML, CSS et JavaScript pour créer des sites web modernes et responsives. Ce cours complet vous guidera à travers les fondamentaux du développement front-end jusqu\'aux techniques avancées.',
-        typeCours: 'Développement Web',
+        titre: 'Développement Web Complet',
+        description: 'Apprenez HTML, CSS, JavaScript, React et Node.js pour devenir développeur web full-stack. Ce cours complet vous guidera à travers les fondamentaux du développement web.',
+        typeCours: 'GRATUIT',
         prix: 0,
         estCertifiant: true,
         sessions: [
           { id: 1, dateDebut: '2026-03-01', dateFin: '2026-03-15' },
           { id: 2, dateDebut: '2026-03-16', dateFin: '2026-03-30' },
-          { id: 3, dateDebut: '2026-04-01', dateFin: '2026-04-15' },
         ]
       },
       {
         id: 2,
-        titre: 'Data Science',
-        description: 'Maîtrisez Python, Pandas et l\'analyse de données. Apprenez à manipuler de grands ensembles de données et à créer des modèles prédictifs.',
-        typeCours: 'Data Science',
+        titre: 'Data Science avec Python',
+        description: 'Maîtrisez Python, Pandas, NumPy et Machine Learning pour analyser des données. Apprenez à manipuler de grands ensembles de données et à créer des modèles prédictifs.',
+        typeCours: 'PAYANT',
         prix: 35000,
         estCertifiant: true,
         sessions: [
@@ -148,9 +147,9 @@ const FormationDetail: React.FC = () => {
       },
       {
         id: 3,
-        titre: 'UX/UI Design',
+        titre: 'UX/UI Design Professionnel',
         description: 'Concevez des interfaces utilisateur intuitives et attrayantes. Apprenez les principes du design et les outils professionnels.',
-        typeCours: 'Design',
+        typeCours: 'PAYANT',
         prix: 25000,
         estCertifiant: true,
         sessions: [
@@ -158,16 +157,38 @@ const FormationDetail: React.FC = () => {
           { id: 2, dateDebut: '2026-03-22', dateFin: '2026-04-12' },
           { id: 3, dateDebut: '2026-04-13', dateFin: '2026-05-04' },
         ]
+      },
+      {
+        id: 4,
+        titre: 'Cybersécurité',
+        description: 'Apprenez à protéger les systèmes et les données contre les cybermenaces. Maîtrisez les techniques de Ethical Hacking et de sécurité réseau.',
+        typeCours: 'PAYANT',
+        prix: 50000,
+        estCertifiant: true,
+        sessions: [
+          { id: 1, dateDebut: '2026-03-01', dateFin: '2026-04-01' },
+          { id: 2, dateDebut: '2026-04-02', dateFin: '2026-05-01' },
+        ]
+      },
+      {
+        id: 5,
+        titre: 'Intelligence Artificielle',
+        description: 'Explorez les concepts avancés de l IA et du Deep Learning. Apprenez à créer des modèles de Machine Learning et des réseaux de neurones.',
+        typeCours: 'PAYANT',
+        prix: 60000,
+        estCertifiant: true,
+        sessions: [
+          { id: 1, dateDebut: '2026-03-01', dateFin: '2026-04-15' },
+          { id: 2, dateDebut: '2026-04-16', dateFin: '2026-05-30' },
+        ]
       }
     ];
 
     const courseId = parseInt(id || '1');
-    const selectedCourse = mockCoursList.find(c => c.id === courseId) || mockCoursList[0];
-
-    setTimeout(() => {
-      setCours(selectedCourse);
-      setLoading(false);
-    }, 500);
+    const selectedCourse = mockCoursList.find(c => c.id === courseId);
+    // eslint-disable-next-line
+    setCours(selectedCourse || null);
+    setLoading(false);
   }, [id]);
 
   const isGratuit = cours?.prix === 0;

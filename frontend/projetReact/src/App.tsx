@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Formations from './pages/Formations';
 import FormationDetail from './pages/FormationDetail';
+import Paiement from './pages/Paiement';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfDashboard from './pages/ProfDashboard';
 import ApprenantDashboard from './pages/ApprenantDashboard';
@@ -21,6 +22,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/formations" element={<Formations />} />
           <Route path="/formations/:id" element={<FormationDetail />} />
+          <Route path="/paiement" element={<Paiement />} />
           
           {/* Routes protégées par profil */}
           <Route 
