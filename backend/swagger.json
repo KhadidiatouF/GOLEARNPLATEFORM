@@ -3,7 +3,7 @@
   "info": {
     "title": "API Formation",
     "version": "1.0.0",
-    "description": "API pour la plateforme de formation en ligne"
+    "description": "API pour la plateforme de formation en ligne - Documentation Swagger avec tous les endpoints"
   },
   "servers": [
     {
@@ -11,11 +11,232 @@
       "description": "Serveur local"
     }
   ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": { "type": "string" },
+          "statusCode": { "type": "integer" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["login", "mdp"],
+        "properties": {
+          "login": { "type": "string", "description": "Email ou nom d'utilisateur" },
+          "mdp": { "type": "string", "description": "Mot de passe" }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "user": { "type": "object" }
+        }
+      },
+      "Utilisateur": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "email": { "type": "string" },
+          "nom": { "type": "string" },
+          "prenom": { "type": "string" },
+          "role": { "type": "string" },
+          "telephone": { "type": "string" },
+          "photo": { "type": "string" }
+        }
+      },
+      "Professeur": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "utilisateurId": { "type": "integer" },
+          "specialite": { "type": "string" },
+          "biographie": { "type": "string" }
+        }
+      },
+      "Apprenant": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "utilisateurId": { "type": "integer" },
+          "niveau": { "type": "string" }
+        }
+      },
+      "Administrateur": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "utilisateurId": { "type": "integer" },
+          "niveauAcces": { "type": "string" }
+        }
+      },
+      "Formation": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "titre": { "type": "string" },
+          "description": { "type": "string" },
+          "duree": { "type": "integer" },
+          "niveau": { "type": "string" },
+          "photo": { "type": "string" },
+          "professeurId": { "type": "integer" },
+          "categorie": { "type": "string" },
+          "prix": { "type": "number" }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "formationId": { "type": "integer" },
+          "dateDebut": { "type": "string", "format": "date-time" },
+          "dateFin": { "type": "string", "format": "date-time" },
+          "maxParticipants": { "type": "integer" },
+          "statut": { "type": "string" }
+        }
+      },
+      "Paiement": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "apprenantId": { "type": "integer" },
+          "formationId": { "type": "integer" },
+          "montant": { "type": "number" },
+          "datePaiement": { "type": "string", "format": "date-time" },
+          "statut": { "type": "string" },
+          "methode": { "type": "string" }
+        }
+      },
+      "Certification": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "apprenantId": { "type": "integer" },
+          "formationId": { "type": "integer" },
+          "dateObtention": { "type": "string", "format": "date-time" },
+          "codeVerification": { "type": "string" }
+        }
+      },
+      "Quiz": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "formationId": { "type": "integer" },
+          "titre": { "type": "string" },
+          "description": { "type": "string" },
+          "duree": { "type": "integer" },
+          "seuilReussite": { "type": "integer" }
+        }
+      },
+      "Question": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "quizId": { "type": "integer" },
+          "texte": { "type": "string" },
+          "type": { "type": "string" },
+          "points": { "type": "integer" }
+        }
+      },
+      "Reponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "questionId": { "type": "integer" },
+          "texte": { "type": "string" },
+          "estCorrecte": { "type": "boolean" }
+        }
+      },
+      "Progression": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "apprenantFormationId": { "type": "integer" },
+          "chapitreId": { "type": "integer" },
+          "statut": { "type": "string" },
+          "tempsPasse": { "type": "integer" }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
   "paths": {
     "/auth/login": {
       "post": {
-        "summary": "Connexion utilisateur",
+        "summary": "Connexion utilisateur (Public - Pas d'authentification requise)",
+        "tags": ["Auth - Public"],
+        "description": "Endpoint public - Permet de se connecter sans token",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connexion réussie",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": { "description": "Identifiants invalides" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "get": {
+        "summary": "Rafraîchir le token",
         "tags": ["Auth"],
+        "responses": {
+          "200": { "description": "Token rafraîchi" },
+          "401": { "description": "Token invalide ou expiré" }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "summary": "Liste des utilisateurs",
+        "tags": ["Utilisateurs"],
+        "responses": {
+          "200": {
+            "description": "Liste des utilisateurs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Utilisateur"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un utilisateur",
+        "tags": ["Utilisateurs"],
         "requestBody": {
           "required": true,
           "content": {
@@ -23,25 +244,1418 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "login": { "type": "string" },
-                  "mdp": { "type": "string" }
+                  "email": { "type": "string" },
+                  "nom": { "type": "string" },
+                  "prenom": { "type": "string" },
+                  "mdp": { "type": "string" },
+                  "role": { "type": "string" },
+                  "telephone": { "type": "string" }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Connexion réussie" },
-          "401": { "description": "Identifiants invalides" }
+          "201": { "description": "Utilisateur créé" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "summary": "Récupérer un utilisateur par ID",
+        "tags": ["Utilisateurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Utilisateur trouvé" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un utilisateur",
+        "tags": ["Utilisateurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "nom": { "type": "string" },
+                  "prenom": { "type": "string" },
+                  "telephone": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Utilisateur mis à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un utilisateur",
+        "tags": ["Utilisateurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Utilisateur supprimé" }
+        }
+      }
+    },
+    "/profs": {
+      "get": {
+        "summary": "Liste des professeurs",
+        "tags": ["Professeurs"],
+        "responses": {
+          "200": {
+            "description": "Liste des professeurs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Professeur"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un professeur",
+        "tags": ["Professeurs"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "utilisateurId": { "type": "integer" },
+                  "specialite": { "type": "string" },
+                  "biographie": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Professeur créé" }
+        }
+      }
+    },
+    "/profs/{id}": {
+      "get": {
+        "summary": "Récupérer un professeur par ID",
+        "tags": ["Professeurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Professeur trouvé" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un professeur",
+        "tags": ["Professeurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "specialite": { "type": "string" },
+                  "biographie": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Professeur mis à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un professeur",
+        "tags": ["Professeurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Professeur supprimé" }
+        }
+      }
+    },
+    "/apprenants": {
+      "get": {
+        "summary": "Liste des apprenants",
+        "tags": ["Apprenants"],
+        "responses": {
+          "200": {
+            "description": "Liste des apprenants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Apprenant"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un apprenant",
+        "tags": ["Apprenants"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "utilisateurId": { "type": "integer" },
+                  "niveau": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Apprenant créé" }
+        }
+      }
+    },
+    "/apprenants/{id}": {
+      "get": {
+        "summary": "Récupérer un apprenant par ID",
+        "tags": ["Apprenants"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Apprenant trouvé" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un apprenant",
+        "tags": ["Apprenants"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "niveau": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Apprenant mis à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un apprenant",
+        "tags": ["Apprenants"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Apprenant supprimé" }
+        }
+      }
+    },
+    "/admin": {
+      "get": {
+        "summary": "Liste des administrateurs",
+        "tags": ["Administrateurs"],
+        "responses": {
+          "200": {
+            "description": "Liste des administrateurs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Administrateur"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un administrateur",
+        "tags": ["Administrateurs"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "utilisateurId": { "type": "integer" },
+                  "niveauAcces": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Administrateur créé" }
+        }
+      }
+    },
+    "/admin/{id}": {
+      "get": {
+        "summary": "Récupérer un administrateur par ID",
+        "tags": ["Administrateurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Administrateur trouvé" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un administrateur",
+        "tags": ["Administrateurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "niveauAcces": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Administrateur mis à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un administrateur",
+        "tags": ["Administrateurs"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Administrateur supprimé" }
         }
       }
     },
     "/formations": {
       "get": {
-        "summary": "Liste des formations",
+        "summary": "Liste des formations (Protégé - Filtré par rôle)",
         "tags": ["Formations"],
+        "description": "Endpoint public - Accessible sans authentification",
         "responses": {
-          "200": { "description": "Liste des formations" }
+          "200": {
+            "description": "Liste des formations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Formation"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer une formation",
+        "tags": ["Formations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "titre": { "type": "string" },
+                  "description": { "type": "string" },
+                  "duree": { "type": "integer" },
+                  "niveau": { "type": "string" },
+                  "photo": { "type": "string" },
+                  "professeurId": { "type": "integer" },
+                  "categorie": { "type": "string" },
+                  "prix": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Formation créée" }
+        }
+      }
+    },
+    "/formations/{id}": {
+      "get": {
+        "summary": "Récupérer une formation par ID (Public)",
+        "tags": ["Formations"],
+        "description": "Endpoint public - Accessible sans authentification",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Formation trouvée" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour une formation",
+        "tags": ["Formations"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "titre": { "type": "string" },
+                  "description": { "type": "string" },
+                  "duree": { "type": "integer" },
+                  "niveau": { "type": "string" },
+                  "photo": { "type": "string" },
+                  "categorie": { "type": "string" },
+                  "prix": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Formation mise à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer une formation",
+        "tags": ["Formations"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Formation supprimée" }
+        }
+      }
+    },
+    "/formations/complete": {
+      "post": {
+        "summary": "Créer une formation complète avec chapitres et quiz",
+        "tags": ["Formations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "formation": {
+                    "type": "object",
+                    "properties": {
+                      "titre": { "type": "string" },
+                      "description": { "type": "string" },
+                      "duree": { "type": "integer" },
+                      "niveau": { "type": "string" },
+                      "photo": { "type": "string" },
+                      "professeurId": { "type": "integer" },
+                      "categorie": { "type": "string" },
+                      "prix": { "type": "number" }
+                    }
+                  },
+                  "chapitres": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "titre": { "type": "string" },
+                        "description": { "type": "string" },
+                        "contenu": { "type": "string" },
+                        "duree": { "type": "integer" },
+                        "ordre": { "type": "integer" }
+                      }
+                    }
+                  },
+                  "quiz": {
+                    "type": "object",
+                    "properties": {
+                      "titre": { "type": "string" },
+                      "description": { "type": "string" },
+                      "duree": { "type": "integer" },
+                      "seuilReussite": { "type": "integer" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Formation complète créée" }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "summary": "Liste des sessions",
+        "tags": ["Sessions"],
+        "responses": {
+          "200": {
+            "description": "Liste des sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Session"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer une session",
+        "tags": ["Sessions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "formationId": { "type": "integer" },
+                  "dateDebut": { "type": "string", "format": "date-time" },
+                  "dateFin": { "type": "string", "format": "date-time" },
+                  "maxParticipants": { "type": "integer" },
+                  "statut": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Session créée" }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "get": {
+        "summary": "Récupérer une session par ID",
+        "tags": ["Sessions"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Session trouvée" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour une session",
+        "tags": ["Sessions"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dateDebut": { "type": "string", "format": "date-time" },
+                  "dateFin": { "type": "string", "format": "date-time" },
+                  "maxParticipants": { "type": "integer" },
+                  "statut": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Session mise à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer une session",
+        "tags": ["Sessions"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Session supprimée" }
+        }
+      }
+    },
+    "/paiements": {
+      "get": {
+        "summary": "Liste des paiements",
+        "tags": ["Paiements"],
+        "responses": {
+          "200": {
+            "description": "Liste des paiements",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Paiement"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un paiement",
+        "tags": ["Paiements"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apprenantId": { "type": "integer" },
+                  "formationId": { "type": "integer" },
+                  "montant": { "type": "number" },
+                  "datePaiement": { "type": "string", "format": "date-time" },
+                  "statut": { "type": "string" },
+                  "methode": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Paiement créé" }
+        }
+      }
+    },
+    "/paiements/{id}": {
+      "get": {
+        "summary": "Récupérer un paiement par ID",
+        "tags": ["Paiements"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Paiement trouvé" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un paiement",
+        "tags": ["Paiements"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "montant": { "type": "number" },
+                  "statut": { "type": "string" },
+                  "methode": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Paiement mis à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un paiement",
+        "tags": ["Paiements"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Paiement supprimé" }
+        }
+      }
+    },
+    "/certifications": {
+      "get": {
+        "summary": "Liste des certifications",
+        "tags": ["Certifications"],
+        "responses": {
+          "200": {
+            "description": "Liste des certifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Certification"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer une certification",
+        "tags": ["Certifications"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apprenantId": { "type": "integer" },
+                  "formationId": { "type": "integer" },
+                  "dateObtention": { "type": "string", "format": "date-time" },
+                  "codeVerification": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Certification créée" }
+        }
+      }
+    },
+    "/certifications/{id}": {
+      "get": {
+        "summary": "Récupérer une certification par ID",
+        "tags": ["Certifications"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Certification trouvée" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer une certification",
+        "tags": ["Certifications"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Certification supprimée" }
+        }
+      }
+    },
+    "/quiz": {
+      "get": {
+        "summary": "Liste des quiz",
+        "tags": ["Quiz"],
+        "responses": {
+          "200": {
+            "description": "Liste des quiz",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Quiz"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un quiz",
+        "tags": ["Quiz"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "formationId": { "type": "integer" },
+                  "titre": { "type": "string" },
+                  "description": { "type": "string" },
+                  "duree": { "type": "integer" },
+                  "seuilReussite": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Quiz créé" }
+        }
+      }
+    },
+    "/quiz/{id}": {
+      "get": {
+        "summary": "Récupérer un quiz par ID",
+        "tags": ["Quiz"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Quiz trouvé" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un quiz",
+        "tags": ["Quiz"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "titre": { "type": "string" },
+                  "description": { "type": "string" },
+                  "duree": { "type": "integer" },
+                  "seuilReussite": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Quiz mis à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer un quiz",
+        "tags": ["Quiz"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Quiz supprimé" }
+        }
+      }
+    },
+    "/quiz/{id}/submit": {
+      "post": {
+        "summary": "Soumettre un quiz",
+        "tags": ["Quiz"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apprenantId": { "type": "integer" },
+                  "reponses": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "questionId": { "type": "integer" },
+                        "reponseId": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Quiz soumis" }
+        }
+      }
+    },
+    "/quiz/formation/{formationId}/can-take-final": {
+      "get": {
+        "summary": "Vérifier si l'apprenant peut passer le quiz final",
+        "tags": ["Quiz"],
+        "parameters": [
+          {
+            "name": "formationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Résultat de la vérification" }
+        }
+      }
+    },
+    "/quiz/formation/{formationId}/summary": {
+      "get": {
+        "summary": "Récupérer le résumé du quiz",
+        "tags": ["Quiz"],
+        "parameters": [
+          {
+            "name": "formationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Résumé du quiz" }
+        }
+      }
+    },
+    "/questions": {
+      "get": {
+        "summary": "Liste des questions",
+        "tags": ["Questions"],
+        "responses": {
+          "200": {
+            "description": "Liste des questions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Question"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer une question",
+        "tags": ["Questions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quizId": { "type": "integer" },
+                  "texte": { "type": "string" },
+                  "type": { "type": "string" },
+                  "points": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Question créée" }
+        }
+      }
+    },
+    "/questions/{id}": {
+      "get": {
+        "summary": "Récupérer une question par ID",
+        "tags": ["Questions"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Question trouvée" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour une question",
+        "tags": ["Questions"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "texte": { "type": "string" },
+                  "type": { "type": "string" },
+                  "points": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Question mise à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer une question",
+        "tags": ["Questions"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Question supprimée" }
+        }
+      }
+    },
+    "/reponses": {
+      "get": {
+        "summary": "Liste des réponses",
+        "tags": ["Réponses"],
+        "responses": {
+          "200": {
+            "description": "Liste des réponses",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Reponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer une réponse",
+        "tags": ["Réponses"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "questionId": { "type": "integer" },
+                  "texte": { "type": "string" },
+                  "estCorrecte": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Réponse créée" }
+        }
+      }
+    },
+    "/reponses/{id}": {
+      "get": {
+        "summary": "Récupérer une réponse par ID",
+        "tags": ["Réponses"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Réponse trouvée" }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour une réponse",
+        "tags": ["Réponses"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "texte": { "type": "string" },
+                  "estCorrecte": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Réponse mise à jour" }
+        }
+      },
+      "delete": {
+        "summary": "Supprimer une réponse",
+        "tags": ["Réponses"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Réponse supprimée" }
+        }
+      }
+    },
+    "/progressions": {
+      "post": {
+        "summary": "Créer une progression",
+        "tags": ["Progressions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apprenantFormationId": { "type": "integer" },
+                  "chapitreId": { "type": "integer" },
+                  "statut": { "type": "string" },
+                  "tempsPasse": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Progression créée" }
+        }
+      }
+    },
+    "/progressions/apprenant/{apprenantFormationId}": {
+      "get": {
+        "summary": "Récupérer la progression d'un apprenant",
+        "tags": ["Progressions"],
+        "parameters": [
+          {
+            "name": "apprenantFormationId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Progression récupérée" }
+        }
+      }
+    },
+    "/progressions/complete": {
+      "post": {
+        "summary": "Marquer un chapitre comme complété",
+        "tags": ["Progressions"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "apprenantFormationId": { "type": "integer" },
+                  "chapitreId": { "type": "integer" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Chapitre marqué comme complété" }
+        }
+      }
+    },
+    "/progressions/professeur": {
+      "get": {
+        "summary": "Récupérer les progressions pour un professeur",
+        "tags": ["Progressions"],
+        "responses": {
+          "200": { "description": "Progressions récupérées" }
+        }
+      }
+    },
+    "/profs/demandes/en-attente": {
+      "get": {
+        "summary": "Récupérer les demandes de professeur en attente (Admin)",
+        "tags": ["Professeurs - Admin"],
+        "description": "Accessible uniquement aux administrateurs",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Demandes de professeur en attente" }
+        }
+      }
+    },
+    "/profs/{id}/valider": {
+      "put": {
+        "summary": "Valider un professeur (Admin)",
+        "tags": ["Professeurs - Admin"],
+        "description": "Accessible uniquement aux administrateurs - Valide un professeur en attente",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Professeur validé" }
+        }
+      }
+    },
+    "/profs/{id}/rejeter": {
+      "put": {
+        "summary": "Rejeter un professeur (Admin)",
+        "tags": ["Professeurs - Admin"],
+        "description": "Accessible uniquement aux administrateurs - Rejette un professeur en attente",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Professeur rejeté" }
+        }
+      }
+    },
+    "/formations/demandes/en-attente": {
+      "get": {
+        "summary": "Récupérer les formations en attente de validation (Admin)",
+        "tags": ["Formations - Admin"],
+        "description": "Accessible uniquement aux administrateurs",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Formations en attente de validation" }
+        }
+      }
+    },
+    "/formations/{id}/valider": {
+      "put": {
+        "summary": "Valider une formation (Admin)",
+        "tags": ["Formations - Admin"],
+        "description": "Accessible uniquement aux administrateurs - Valide une formation en attente",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Formation validée" }
+        }
+      }
+    },
+    "/formations/{id}/rejeter": {
+      "put": {
+        "summary": "Rejeter une formation (Admin)",
+        "tags": ["Formations - Admin"],
+        "description": "Accessible uniquement aux administrateurs - Rejette une formation en attente",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Formation rejetée" }
         }
       }
     }

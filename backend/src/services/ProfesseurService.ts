@@ -27,4 +27,19 @@ export class ProfesseurService{
     deleteProfesseur(id: number){
         return this.professeurRepo.delete(id)
     }
+
+    // Valider un professeur
+    async validerProfesseur(id: number) {
+        return await this.professeurRepo.updateStatut(id, 'VALIDE');
+    }
+
+    // Rejeter un professeur
+    async rejeterProfesseur(id: number) {
+        return await this.professeurRepo.updateStatut(id, 'REJETE');
+    }
+
+    // Récupérer les demandes en attente
+    getDemandesEnAttente(){
+        return this.professeurRepo.findByStatut('EN_ATTENTE');
+    }
 }

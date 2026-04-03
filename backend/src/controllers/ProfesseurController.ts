@@ -7,8 +7,8 @@ import { professeurSchema } from "../validators/ProfesseurValidator";
 
 const professeurService = new ProfesseurService();
 
-export class ProfesseurController{
- 
+export class ProfessController{
+  
     static async getAllProfesseurs(req: Request, res: Response, next: NextFunction){
         try {
             const professeurs = await professeurService.getAllProfesseurs();
@@ -45,7 +45,8 @@ export class ProfesseurController{
         const data = professeurSchema.parse(req.body);
         const professeurC = await professeurService.createProfesseur(data);
 
-        return FormaterResponse.success(res, professeurC, "Professeur créé avec succès", HttpCode.CREATED);
+        // Le professeur est créé avec le statut EN_ATTENTE par défaut
+        return FormaterResponse.success(res, professeurC, "Demande de professeur soumise avec succès. En attente de validation par l'administrateur.", HttpCode.CREATED);
 
      } catch (error: any) {
 
@@ -83,6 +84,42 @@ export class ProfesseurController{
             res.status(HttpCode.NO_CONTENT).send()
         }catch (error: any) {
             return (FormaterResponse.failed(res,"Professeur non trouvé", 404))
+        }
+    }
+
+    // Valider un professeur (action admin)
+    static async validerProfesseur(req: Request, res: Response, next: NextFunction) {
+        try {
+            const id: number = Number(req.params.id);
+            const professeur = await professeurService.validerProfesseur(id);
+            if (professeur) {
+                FormaterResponse.success(res, professeur, "Professeur validé avec succès", HttpCode.OK);
+            }
+        } catch (error: any) {
+            return FormaterResponse.failed(res, error.message || "Erreur lors de la validation", HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Rejeter un professeur (action admin)
+    static async rejeterProfesseur(req: Request, res: Response, next: NextFunction) {
+        try {
+            const id: number = Number(req.params.id);
+            const professeur = await professeurService.rejeterProfesseur(id);
+            if (professeur) {
+                FormaterResponse.success(res, professeur, "Professeur rejeté avec succès", HttpCode.OK);
+            }
+        } catch (error: any) {
+            return FormaterResponse.failed(res, error.message || "Erreur lors du rejet", HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // Récupérer les demandes de professeur en attente
+    static async getDemandesEnAttente(req: Request, res: Response, next: NextFunction) {
+        try {
+            const demandes = await professeurService.getDemandesEnAttente();
+            FormaterResponse.success(res, demandes, "Demandes de professeur en attente", HttpCode.OK);
+        } catch (error: any) {
+            return FormaterResponse.failed(res, error.message || "Erreur serveur", HttpCode.INTERNAL_SERVER_ERROR);
         }
     }
 

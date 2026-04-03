@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `Chapitre` ADD COLUMN `pdfUrl` VARCHAR(191) NULL,
+    ADD COLUMN `videoUrl` VARCHAR(191) NULL;

@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { ReponseController } from "../controllers/ReponseController";
+import { authenticate } from "../middlewares/auth";
 
 const router = Router();
 
-router.get("/", ReponseController.getAllReponses);
-router.get("/:id", ReponseController.getOneReponse);
-router.post("/", ReponseController.createReponse);
-router.put("/:id", ReponseController.updateReponse);
-router.delete("/:id", ReponseController.deleteReponse);
+router.get("/", authenticate, ReponseController.getAllReponses);
+router.get("/:id", authenticate, ReponseController.getOneReponse);
+router.post("/", authenticate, ReponseController.createReponse);
+router.put("/:id", authenticate, ReponseController.updateReponse);
+router.delete("/:id", authenticate, ReponseController.deleteReponse);
 
 export default router;

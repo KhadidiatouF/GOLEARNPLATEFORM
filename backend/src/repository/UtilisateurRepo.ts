@@ -7,20 +7,51 @@ import { IRepository } from "./IRepository";
 export class UtilisateurRepo implements IRepository <Utilisateur>{
     private prisma : PrismaClient = new PrismaClient();
     
-    async findAll(): Promise<Utilisateur[]> {
-        return await this.prisma.utilisateur.findMany({});
+    async findAll(page: number = 1, limit: number = 10): Promise<{data: Utilisateur[], total: number, page: number, limit: number}> {
+        const skip = (page - 1) * limit;
+        const [users, total] = await Promise.all([
+            this.prisma.utilisateur.findMany({
+                skip,
+                take: limit,
+                include: {
+                    apprenant: true,
+                    professeur: true
+                },
+                orderBy: { id: 'desc' }
+            }),
+            this.prisma.utilisateur.count()
+        ]);
+        return { data: users, total, page, limit };
     }
 
     async findById(id: number): Promise<any> {
         return await this.prisma.utilisateur.findUnique({where: {id}});
     }
 
-    async create(data: Omit<Utilisateur, "id">): Promise<Utilisateur> {
-        return await this.prisma.utilisateur.create({data});
+    async findByLogin(login: string): Promise<any> {
+        return await this.prisma.utilisateur.findUnique({where: {login}});
     }
 
-    async update(id: number, data: Utilisateur): Promise<Utilisateur> {
-        return await this.prisma.utilisateur.update({where: {id}, data});
+    async create(data: any): Promise<Utilisateur> {
+        // Filtrer les champs undefined pour éviter les erreurs Prisma
+        const cleanedData: any = {};
+        for (const [key, value] of Object.entries(data)) {
+            if (value !== undefined) {
+                cleanedData[key] = value;
+            }
+        }
+        return await this.prisma.utilisateur.create({data: cleanedData});
+    }
+
+    async update(id: number, data: any): Promise<Utilisateur> {
+        // Filtrer les champs undefined pour éviter les erreurs Prisma
+        const cleanedData: any = {};
+        for (const [key, value] of Object.entries(data)) {
+            if (value !== undefined) {
+                cleanedData[key] = value;
+            }
+        }
+        return await this.prisma.utilisateur.update({where: {id}, data: cleanedData});
     }
 
     async delete(id: number): Promise<void> {

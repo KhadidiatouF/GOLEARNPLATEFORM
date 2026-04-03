@@ -29,6 +29,7 @@ model Professeur {
   utilisateurId Int         @unique
   formations    Formation[]
   utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  statut        StatutProfesseur @default(EN_ATTENTE)
 }
 
 model Apprenant {
@@ -63,6 +64,7 @@ model Formation {
   professeur     Professeur           @relation(fields: [professeurId], references: [id])
   quiz           Quiz[]
   sessions       Session[]
+  statut         StatutFormation     @default(EN_ATTENTE)
 
   @@index([professeurId], map: "Formation_professeurId_fkey")
 }
@@ -79,16 +81,18 @@ model Session {
 
   @@index([formationId], map: "Session_formationId_fkey")
 }
-
 model Chapitre {
   id          Int        @id @default(autoincrement())
   titre       String
-  contenu     String
+  contenu     String     @db.Text
   duree       String
   typeContenu TypeContenu
   ordre       Int        @default(0)
+  videoUrl    String?    // URL video (YouTube, Vimeo, etc.)
+  pdfUrl      String?    // URL PDF
   sessionId   Int
   session     Session    @relation(fields: [sessionId], references: [id])
+  progressions ApprenantChapitre[]
 
   @@index([sessionId], map: "Chapitre_sessionId_fkey")
 }
@@ -120,10 +124,31 @@ model ApprenantFormation {
   id          Int       @id @default(autoincrement())
   apprenantId Int
   formationId Int
+  progression Progression?
   apprenant   Apprenant @relation(fields: [apprenantId], references: [id])
   formation   Formation @relation(fields: [formationId], references: [id])
 
   @@unique([apprenantId, formationId])
+}
+
+model Progression {
+  id                   Int                  @id @default(autoincrement())
+  apprenantFormationId Int                  @unique
+  chapitresCompletes   ApprenantChapitre[]
+  dateDerniereActivite DateTime             @default(now())
+  apprenantFormation   ApprenantFormation   @relation(fields: [apprenantFormationId], references: [id])
+}
+
+model ApprenantChapitre {
+  id          Int       @id @default(autoincrement())
+  estComplete Boolean   @default(false)
+  dateCompletion DateTime?
+  progressionId Int
+  chapitreId   Int
+  progression  Progression @relation(fields: [progressionId], references: [id])
+  chapitre     Chapitre  @relation(fields: [chapitreId], references: [id])
+
+  @@unique([progressionId, chapitreId])
 }
 
 model Quiz {
@@ -156,6 +181,18 @@ enum Role {
   ADMIN
   PROF
   APPRENANT
+}
+
+enum StatutProfesseur {
+  EN_ATTENTE
+  VALIDE
+  REJETE
+}
+
+enum StatutFormation {
+  EN_ATTENTE
+  VALIDEE
+  REJETEE
 }
 
 enum TypeContenu {

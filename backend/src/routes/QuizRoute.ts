@@ -1,17 +1,18 @@
 import { Router } from "express";
 import { QuizController } from "../controllers/QuizController";
+import { authenticate } from "../middlewares/auth";
 
 const router = Router();
 
-router.get("/", QuizController.getAllQuizzes);
-router.get("/:id", QuizController.getOneQuiz);
-router.post("/", QuizController.createQuiz);
-router.put("/:id", QuizController.updateQuiz);
-router.delete("/:id", QuizController.deleteQuiz);
+router.get("/", authenticate, QuizController.getAllQuizzes);
+router.get("/:id", authenticate, QuizController.getOneQuiz);
+router.post("/", authenticate, QuizController.createQuiz);
+router.put("/:id", authenticate, QuizController.updateQuiz);
+router.delete("/:id", authenticate, QuizController.deleteQuiz);
 
 // Nouvelles routes pour la logique métier des quiz
-router.post("/:id/submit", QuizController.submitQuiz);
-router.get("/formation/:formationId/can-take-final", QuizController.checkCanTakeFinalQuiz);
-router.get("/formation/:formationId/summary", QuizController.getQuizSummary);
+router.post("/:id/submit", authenticate, QuizController.submitQuiz);
+router.get("/formation/:formationId/can-take-final", authenticate, QuizController.checkCanTakeFinalQuiz);
+router.get("/formation/:formationId/summary", authenticate, QuizController.getQuizSummary);
 
 export default router;

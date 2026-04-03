@@ -35,7 +35,10 @@ export class AuthRepository{
         
         const {login, mdp} = connexion;
 
-        const userTrouve = await prisma.utilisateur.findUnique({where: {login}});
+        const userTrouve = await prisma.utilisateur.findUnique({
+            where: {login},
+            include: { professeur: true }
+        });
 
         if (!userTrouve) {
             throw new Error("Login ou mot de passe incorrect");
@@ -56,8 +59,13 @@ export class AuthRepository{
 
         const {mdp: _mdp, ...userwithoutpassword} = userTrouve;
 
+        // Ajouter le professeurId si l'utilisateur est un professeur
+        const userResponse: any = { ...userwithoutpassword };
+        if (userTrouve.role === 'PROF' && userTrouve.professeur) {
+            userResponse.professeurId = userTrouve.professeur.id;
+        }
 
-        return {accessToken, refreshToken , user: userwithoutpassword}
+        return {accessToken, refreshToken , user: userResponse}
 
 
 

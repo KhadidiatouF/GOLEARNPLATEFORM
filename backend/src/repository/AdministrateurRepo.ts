@@ -4,10 +4,18 @@ import { IRepository } from "./IRepository";
 export class AdministrateurRepo implements IRepository<Administrateur> {
     private prisma: PrismaClient = new PrismaClient();
 
-    async findAll(): Promise<Administrateur[]> {
-        return await this.prisma.administrateur.findMany({
-            include: { utilisateur: true }
-        });
+    async findAll(page: number = 1, limit: number = 10): Promise<{data:Administrateur[], total:number, page:number, limit:number}> {
+        const skip = (page - 1) * limit;
+        const [admins, total] = await Promise.all([
+            this.prisma.administrateur.findMany({
+                skip,
+                take: limit,
+                include: { utilisateur: true },
+                orderBy: { id: 'desc' }
+            }),
+            this.prisma.administrateur.count()
+        ]);
+        return { data: admins, total, page, limit };
     }
 
     async findById(id: number): Promise<any> {

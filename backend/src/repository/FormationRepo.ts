@@ -4,13 +4,22 @@ import { IRepository } from "./IRepository";
 export class FormationRepo implements IRepository<Formation> {
     private prisma: PrismaClient = new PrismaClient();
 
-    async findAll(): Promise<Formation[]> {
-        return await this.prisma.formation.findMany({
-            include: { 
-                professeur: { include: { utilisateur: true } },
-                sessions: true
-            }
-        });
+    async findAll(page: number = 1, limit: number = 10): Promise<{data: Formation[], total: number, page: number, limit: number}> {
+        const skip = (page - 1) * limit;
+        const [formations, total] = await Promise.all([
+            this.prisma.formation.findMany({
+                skip,
+                take: limit,
+                include: { 
+                    professeur: { include: { utilisateur: true } },
+                    sessions: true,
+                    apprenants: true
+                },
+                orderBy: { dateCreation: 'desc' }
+            }),
+            this.prisma.formation.count()
+        ]);
+        return { data: formations, total, page, limit };
     }
 
     async findById(id: number): Promise<any> {
@@ -19,7 +28,16 @@ export class FormationRepo implements IRepository<Formation> {
             include: { 
                 professeur: { include: { utilisateur: true } },
                 sessions: {
-                    include: { chapitres: true, quiz: true }
+                    include: { 
+                        chapitres: true, 
+                        quiz: {
+                            include: {
+                                questions: {
+                                    include: { reponses: true }
+                                }
+                            }
+                        }
+                    }
                 },
                 apprenants: true
             }
@@ -41,6 +59,25 @@ export class FormationRepo implements IRepository<Formation> {
     async findByProfesseurId(professeurId: number): Promise<Formation[]> {
         return await this.prisma.formation.findMany({
             where: { professeurId },
+            include: { 
+                professeur: { include: { utilisateur: true } },
+                sessions: true
+            }
+        });
+    }
+
+    // Mettre à jour le statut de la formation
+    async updateStatut(id: number, statut: string): Promise<Formation> {
+        return await this.prisma.formation.update({
+            where: { id },
+            data: { statut: statut as any }
+        });
+    }
+
+    // Trouver les formations par statut
+    async findByStatut(statut: string): Promise<Formation[]> {
+        return await this.prisma.formation.findMany({
+            where: { statut: statut as any },
             include: { 
                 professeur: { include: { utilisateur: true } },
                 sessions: true

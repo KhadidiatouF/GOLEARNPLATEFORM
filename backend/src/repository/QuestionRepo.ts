@@ -4,10 +4,18 @@ import { IRepository } from "./IRepository";
 export class QuestionRepo implements IRepository<Question> {
     private prisma: PrismaClient = new PrismaClient();
 
-    async findAll(): Promise<Question[]> {
-        return await this.prisma.question.findMany({
-            include: { quiz: true, reponses: true }
-        });
+    async findAll(page: number = 1, limit: number = 10): Promise<{data:Question[], total:number, page:number, limit:number}> {
+        const skip = (page - 1) * limit;
+        const [questions, total] = await Promise.all([
+            this.prisma.question.findMany({
+                skip,
+                take: limit,
+                include: { quiz: true, reponses: true },
+                orderBy: { id: 'desc' }
+            }),
+            this.prisma.question.count()
+        ]);
+        return { data: questions, total, page, limit };
     }
 
     async findById(id: number): Promise<any> {

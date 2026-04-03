@@ -3,7 +3,8 @@ import { UtilisateurService } from "../services/UtilisateurService";
 import { FormaterResponse } from "../middlewares/formateReponse";
 import { HttpCode } from "../enums/codeError";
 import { ZodError } from "zod";
-import { utilisateurSchema } from "../validators/UtilisateurValidator";
+import { utilisateurSchema, updateUtilisateurSchema } from "../validators/UtilisateurValidator";
+import { PrismaClient } from "@prisma/client";
 
 const utilisateurService = new UtilisateurService();
 
@@ -11,9 +12,22 @@ export class UtilisateurController{
  
     static async getAllUsers(req: Request, res: Response, next: NextFunction){
         try {
-            const users = await utilisateurService.getAllUser();
-            if (users) {
-                FormaterResponse.success(res, users, "Users récupérés  avec succès", HttpCode.OK )
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+            
+            const result = await utilisateurService.getAllUser(page, limit);
+            
+            // Vérifier si le résultat existe (pas si le tableau est vide)
+            if (result) {
+                FormaterResponse.success(res, {
+                    users: result.data,
+                    pagination: {
+                        page: result.page,
+                        limit: result.limit,
+                        total: result.total,
+                        totalPages: Math.ceil(result.total / result.limit)
+                    }
+                }, "Users récupérés avec succès", HttpCode.OK )
             }else{
                FormaterResponse.failed(res, "Utilisateurs non trouvés",404)
             }
@@ -36,6 +50,42 @@ export class UtilisateurController{
         } catch (error) {
             next(error)
             
+        }
+    }
+
+    // Récupérer le profil de l'utilisateur connecté (avec son solde)
+    static async getMonProfil(req: Request, res: Response, next: NextFunction) {
+        try {
+            // L'ID de l'utilisateur est dans req.user.id (injecté par le middleware authenticate)
+            const userIdAny = (req as any).user?.id;
+            
+            console.log('getMonProfil - user from token:', (req as any).user);
+            console.log('getMonProfil - raw userId:', userIdAny, 'type:', typeof userIdAny);
+            
+            // Convertir explicitement en nombre
+            const userId = Number(userIdAny);
+            console.log('getMonProfil - converted userId:', userId, 'isNaN:', isNaN(userId));
+            
+            if (!userId || isNaN(userId)) {
+                return FormaterResponse.failed(res, "Utilisateur non identifié", HttpCode.UNAUTHORIZED);
+            }
+            
+            // Utiliser le repository directement pour éviter le problème
+            const prisma = new PrismaClient();
+            const user = await prisma.utilisateur.findUnique({
+                where: { id: userId }
+            });
+            
+            console.log('getMonProfil - user from DB:', user);
+            
+            if (user) {
+                FormaterResponse.success(res, user, "Profil récupéré avec succès", HttpCode.OK);
+            } else {
+                FormaterResponse.failed(res, "Utilisateur non trouvé", 404);
+            }
+        } catch (error: any) {
+            console.error('getMonProfil - error:', error);
+            next(error);
         }
     }
 
@@ -71,14 +121,25 @@ export class UtilisateurController{
     static async updateUser(req:Request, res: Response, next: NextFunction){
         try {
             const id: number = Number (req.params.id)
-            const data = utilisateurSchema.parse(req.body); 
+            // Utiliser le schéma de mise à jour (champs optionnels)
+            const data = updateUtilisateurSchema.parse(req.body); 
             const userU = await utilisateurService.updateUser(id, data)
             if (userU) {
               FormaterResponse.success(res, userU, "User Modifié  avec succès", 200 )
+            } else {
+              FormaterResponse.failed(res, "Utilisateur non trouvé", 404)
             }
         } catch (error: any) {
-            return (FormaterResponse.failed(res,"Utilisateur non trouvé", 404))
-
+            // Si l'erreur est une erreur Prisma (record not found)
+            if (error.code === 'P2025') {
+                return FormaterResponse.failed(res, "Utilisateur non trouvé", 404)
+            }
+            // Si l'erreur est une erreur de validation Zod
+            if (error instanceof ZodError) {
+                const firstError = error.issues[0]?.message || "Erreur de validation";
+                return FormaterResponse.failed(res, firstError, 400);
+            }
+            return FormaterResponse.failed(res, "Erreur serveur", 500)
         }
     }
 

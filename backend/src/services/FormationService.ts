@@ -33,8 +33,13 @@ export class FormationService {
         return await this.formationRepo.findAll();
     }
 
-    getAllFormations() {
-        return this.formationRepo.findAll();
+    getAllFormations(page: number = 1, limit: number = 10) {
+        return this.formationRepo.findAll(page, limit);
+    }
+
+    // Retourne uniquement les formations validées (pour le grand public)
+    getFormationsPubliques() {
+        return this.formationRepo.findByStatut('VALIDEE');
     }
 
     getOneFormation(id: number) {
@@ -51,6 +56,21 @@ export class FormationService {
 
     deleteFormation(id: number) {
         return this.formationRepo.delete(id);
+    }
+
+    // Valider une formation
+    async validerFormation(id: number) {
+        return await this.formationRepo.updateStatut(id, 'VALIDEE');
+    }
+
+    // Rejeter une formation
+    async rejeterFormation(id: number) {
+        return await this.formationRepo.updateStatut(id, 'REJETEE');
+    }
+
+    // Récupérer les formations en attente de validation
+    getFormationsEnAttente() {
+        return this.formationRepo.findByStatut('EN_ATTENTE');
     }
 
     /**
@@ -100,7 +120,7 @@ export class FormationService {
                                 titre: chapitreData.titre,
                                 contenu: chapitreData.contenu,
                                 duree: chapitreData.duree,
-                                typeContenu: chapitreData.typeContenu,
+                                typeContenu: chapitreData.typeContenu || 'VIDEO',
                                 ordre: chapitreData.ordre || 0,
                                 sessionId: session.id
                             }
