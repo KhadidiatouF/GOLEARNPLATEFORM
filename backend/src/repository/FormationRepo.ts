@@ -28,8 +28,9 @@ export class FormationRepo implements IRepository<Formation> {
             include: { 
                 professeur: { include: { utilisateur: true } },
                 sessions: {
+                    orderBy: { id: 'asc' },
                     include: { 
-                        chapitres: true, 
+                        chapitres: { orderBy: { ordre: 'asc' } }, 
                         quiz: {
                             include: {
                                 questions: {
@@ -77,7 +78,7 @@ export class FormationRepo implements IRepository<Formation> {
     // Trouver les formations par statut
     async findByStatut(statut: string): Promise<Formation[]> {
         return await this.prisma.formation.findMany({
-            where: { statut: statut as any },
+            where: { statut: "VALIDEE" },
             include: { 
                 professeur: { include: { utilisateur: true } },
                 sessions: true

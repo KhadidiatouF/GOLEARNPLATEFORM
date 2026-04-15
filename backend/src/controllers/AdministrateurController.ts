@@ -74,4 +74,13 @@ export class AdministrateurController {
             return FormaterResponse.failed(res, "Administrateur non trouvé", 404);
         }
     }
+
+    static async getStatistics(req: Request, res: Response, next: NextFunction) {
+        try {
+            const statistics = await administrateurService.getStatistics();
+            FormaterResponse.success(res, statistics, "Statistiques récupérées avec succès", HttpCode.OK);
+        } catch (error) {
+            next(error);
+        }
+    }
 }

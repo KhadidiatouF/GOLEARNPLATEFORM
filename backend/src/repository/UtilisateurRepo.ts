@@ -7,10 +7,29 @@ import { IRepository } from "./IRepository";
 export class UtilisateurRepo implements IRepository <Utilisateur>{
     private prisma : PrismaClient = new PrismaClient();
     
-    async findAll(page: number = 1, limit: number = 10): Promise<{data: Utilisateur[], total: number, page: number, limit: number}> {
+    async findAll(page: number = 1, limit: number = 10, role?: string, search?: string): Promise<{data: Utilisateur[], total: number, page: number, limit: number}> {
         const skip = (page - 1) * limit;
+        
+        const whereClause: any = {};
+        
+        // Filtre par rôle
+        if (role) {
+            whereClause.role = role;
+        }
+
+        // Filtre par recherche sur nom, prénom ou email (sensible à la casse pour compatibilité)
+        if (search && search.trim()) {
+            const searchTerm = search.trim();
+            whereClause.OR = [
+                { nom: { contains: searchTerm } },
+                { prenom: { contains: searchTerm } },
+                { email: { contains: searchTerm } }
+            ];
+        }
+
         const [users, total] = await Promise.all([
             this.prisma.utilisateur.findMany({
+                where: whereClause,
                 skip,
                 take: limit,
                 include: {
@@ -19,7 +38,7 @@ export class UtilisateurRepo implements IRepository <Utilisateur>{
                 },
                 orderBy: { id: 'desc' }
             }),
-            this.prisma.utilisateur.count()
+            this.prisma.utilisateur.count({ where: whereClause })
         ]);
         return { data: users, total, page, limit };
     }

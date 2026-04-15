@@ -1,5 +1,5 @@
 import { FormationRepo } from "../repository/FormationRepo";
-import { Role, PrismaClient, TypeContenu } from "@prisma/client";
+import { Role, PrismaClient } from "@prisma/client";
 import { CompleteFormationData } from "../validators/FormationValidator";
 
 export interface UserContext {
@@ -21,7 +21,8 @@ export class FormationService {
     async getFormations(userContext: UserContext) {
         // ADMIN : voir toutes les formations
         if (userContext.role === Role.ADMIN) {
-            return await this.formationRepo.findAll();
+            const result = await this.formationRepo.findAll();
+            return result.data;
         }
         
         // PROF : voir uniquement ses propres formations
@@ -30,7 +31,8 @@ export class FormationService {
         }
         
         // APPRENANT : voir toutes les formations (ou selon votre logique)
-        return await this.formationRepo.findAll();
+        const result = await this.formationRepo.findAll();
+        return result.data;
     }
 
     getAllFormations(page: number = 1, limit: number = 10) {
@@ -39,7 +41,7 @@ export class FormationService {
 
     // Retourne uniquement les formations validées (pour le grand public)
     getFormationsPubliques() {
-        return this.formationRepo.findByStatut('VALIDEE');
+        return this.formationRepo.findByStatut('VALIDE');
     }
 
     getOneFormation(id: number) {

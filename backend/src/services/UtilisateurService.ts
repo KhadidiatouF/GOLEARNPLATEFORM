@@ -11,8 +11,8 @@ export class UtilisateurService{
         this.utilisateurRepo = new UtilisateurRepo();
     }
 
-    getAllUser(page: number = 1, limit: number = 5){
-        return this.utilisateurRepo.findAll(page, limit);
+    getAllUser(page: number = 1, limit: number = 5, role?: string, search?: string){
+        return this.utilisateurRepo.findAll(page, limit, role, search);
     }
 
     getOneUser(id: number){

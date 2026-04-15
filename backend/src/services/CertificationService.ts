@@ -7,8 +7,12 @@ export class CertificationService {
         this.certificationRepo = new CertificationRepo();
     }
 
-    getAllCertifications() {
-        return this.certificationRepo.findAll();
+    getAllCertifications(apprenantId?: number) {
+        return this.certificationRepo.findAll(1, 100, apprenantId);
+    }
+
+    getCertificationsByApprenantId(apprenantId: number) {
+        return this.certificationRepo.findAll(1, 100, apprenantId);
     }
 
     getOneCertification(id: number) {

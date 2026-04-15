@@ -6,7 +6,7 @@ import { z } from "zod";
 export const formationSchema = z.object({
     titre: z.string().min(2, "Le titre doit contenir au moins 2 caractères"),
     description: z.string().min(10, "La description doit contenir au moins 10 caractères"),
-    prix: z.number().positive("Le prix doit être positif"),
+    prix: z.number().min(0, "Le prix ne peut pas être négatif"),
     categorie: z.string().min(1, "La catégorie est requise"),
     niveau: z.string().min(1, "Le niveau est requis"),
     image: z.string().optional(),
@@ -60,7 +60,7 @@ export const completeFormationSchema = z.object({
     // Données de la formation
     titre: z.string().min(2, "Le titre doit contenir au moins 2 caractères"),
     description: z.string().min(10, "La description doit contenir au moins 10 caractères"),
-    prix: z.number().positive("Le prix doit être positif"),
+    prix: z.number().min(0, "Le prix ne peut pas être négatif"),
     categorie: z.string().min(1, "La catégorie est requise"),
     niveau: z.string().min(1, "Le niveau est requis"),
     image: z.string().optional(),

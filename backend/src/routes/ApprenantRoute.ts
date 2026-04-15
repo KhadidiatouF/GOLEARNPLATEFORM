@@ -57,7 +57,7 @@ router.get("/by-user/:userId/formations", authenticate, async (req, res) => {
             return {
                 id: inscription.formation.id,
                 title: inscription.formation.titre,
-                professor: inscription.formation.professeur?.utilisateur?.nom || "Inconnu",
+                professor: `${inscription.formation.professeur?.utilisateur?.prenom || ""} ${inscription.formation.professeur?.utilisateur?.nom || "Inconnu"}`.trim(),
                 duration: `${inscription.formation.niveau || "N/A"}`,
                 image: inscription.formation.image,
                 dateInscription: inscription.progression?.dateDerniereActivite?.toString() || new Date().toString(),
@@ -111,7 +111,7 @@ router.get("/:id/formations", authenticate, async (req, res) => {
             return {
                 id: inscription.formation.id,
                 title: inscription.formation.titre,
-                professor: inscription.formation.professeur?.utilisateur?.nom || "Inconnu",
+                professor: `${inscription.formation.professeur?.utilisateur?.prenom || ""} ${inscription.formation.professeur?.utilisateur?.nom || "Inconnu"}`.trim(),
                 duration: `${inscription.formation.niveau || "N/A"}`,
                 image: inscription.formation.image,
                 dateInscription: inscription.progression?.dateDerniereActivite?.toString() || new Date().toString(),

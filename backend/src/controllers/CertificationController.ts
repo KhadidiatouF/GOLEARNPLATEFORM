@@ -3,6 +3,7 @@ import { CertificationService } from "../services/CertificationService";
 import { FormaterResponse } from "../middlewares/formateReponse";
 import { HttpCode } from "../enums/codeError";
 import { ZodError } from "zod";
+import { PrismaClient } from "@prisma/client";
 import { certificationSchema } from "../validators/CertificationValidator";
 
 const certificationService = new CertificationService();
@@ -10,11 +11,29 @@ const certificationService = new CertificationService();
 export class CertificationController {
     static async getAllCertifications(req: Request, res: Response, next: NextFunction) {
         try {
-            const certifications = await certificationService.getAllCertifications();
+            const userId = (req as any).user?.id;
+            
+            if (!userId) {
+                return FormaterResponse.failed(res, "Utilisateur non authentifié", HttpCode.UNAUTHORIZED);
+            }
+
+            // Récupérer l'apprenant correspondant à cet utilisateur
+            const prisma = new PrismaClient();
+            const apprenant = await prisma.apprenant.findFirst({
+                where: { utilisateurId: Number(userId) }
+            });
+
+            if (!apprenant) {
+                return FormaterResponse.success(res, { data: [], total: 0, page: 1, limit: 100 }, "Aucun certificat", HttpCode.OK);
+            }
+
+            // ✅ Seul les certificats de cet apprenant sont renvoyés
+            const certifications = await certificationService.getCertificationsByApprenantId(apprenant.id);
+            
             if (certifications) {
                 FormaterResponse.success(res, certifications, "Certifications récupérées avec succès", HttpCode.OK);
             } else {
-                FormaterResponse.failed(res, "Certifications non trouvées", 404);
+                FormaterResponse.success(res, { data: [], total: 0, page: 1, limit: 100 }, "Aucun certificat", HttpCode.OK);
             }
         } catch (error) {
             next(error);

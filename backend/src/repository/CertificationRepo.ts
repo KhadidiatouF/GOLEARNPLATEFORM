@@ -4,10 +4,17 @@ import { IRepository } from "./IRepository";
 export class CertificationRepo implements IRepository<Certification> {
     private prisma: PrismaClient = new PrismaClient();
 
-    async findAll(page: number = 1, limit: number = 10): Promise<{data:Certification[], total:number, page:number, limit:number}> {
+    async findAll(page: number = 1, limit: number = 10, apprenantId?: number): Promise<{data:Certification[], total:number, page:number, limit:number}> {
         const skip = (page - 1) * limit;
+        
+        const whereClause: any = {};
+        if (apprenantId) {
+            whereClause.apprenantId = apprenantId;
+        }
+
         const [certs, total] = await Promise.all([
             this.prisma.certification.findMany({
+                where: whereClause,
                 skip,
                 take: limit,
                 include: { 
@@ -16,7 +23,7 @@ export class CertificationRepo implements IRepository<Certification> {
                 },
                 orderBy: { id: 'desc' }
             }),
-            this.prisma.certification.count()
+            this.prisma.certification.count({ where: whereClause })
         ]);
         return { data: certs, total, page, limit };
     }

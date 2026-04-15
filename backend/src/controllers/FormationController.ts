@@ -75,6 +75,7 @@ export class FormationController {
                 return FormaterResponse.failed(res, "La formation existe déjà", HttpCode.CONFLICT);
             }
             if (error instanceof ZodError) {
+                console.log('ERREUR VALIDATION ZOD:', JSON.stringify(error.issues, null, 2)); // ✅ Ajoutez cette ligne
                 const firstError = error.issues[0]?.message || "Erreur de validation";
                 return FormaterResponse.failed(res, firstError, HttpCode.BAD_REQUEST);
             }
@@ -117,10 +118,13 @@ export class FormationController {
             const formation = await formationService.createCompleteFormation(data);
             return FormaterResponse.success(res, formation, "Formation complète créée avec succès. En attente de validation par l'administrateur.", HttpCode.CREATED);
         } catch (error: any) {
+            console.log('❌ ERREUR CREATE FORMATION:', error);
+            
             if (error.code === "P2002") {
                 return FormaterResponse.failed(res, "La formation existe déjà", HttpCode.CONFLICT);
             }
             if (error instanceof ZodError) {
+                console.log('❌ ERREUR VALIDATION ZOD:', JSON.stringify(error.issues, null, 2));
                 const firstError = error.issues[0]?.message || "Erreur de validation";
                 return FormaterResponse.failed(res, firstError, HttpCode.BAD_REQUEST);
             }
@@ -132,11 +136,14 @@ export class FormationController {
     static async validerFormation(req: Request, res: Response, next: NextFunction) {
         try {
             const id: number = Number(req.params.id);
+            console.log('Validation formation ID:', id);
             const formation = await formationService.validerFormation(id);
+            console.log('Formation mise à jour:', formation);
             if (formation) {
                 FormaterResponse.success(res, formation, "Formation validée avec succès", HttpCode.OK);
             }
         } catch (error: any) {
+            console.error('ERREUR PRISMA:', error);
             return FormaterResponse.failed(res, error.message || "Erreur lors de la validation", HttpCode.INTERNAL_SERVER_ERROR);
         }
     }

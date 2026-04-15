@@ -4,19 +4,52 @@ import { IRepository } from "./IRepository";
 export class PaiementRepo implements IRepository<Paiement> {
     private prisma: PrismaClient = new PrismaClient();
 
-    async findAll(page: number = 1, limit: number = 10): Promise<{data:Paiement[], total:number, page:number, limit:number}> {
-        const skip = (page - 1) * limit;
-        const [paiements, total] = await Promise.all([
-            this.prisma.paiement.findMany({
-                skip,
-                take: limit,
-                include: { apprenant: { include: { utilisateur: true } } },
-                orderBy: { id: 'desc' }
-            }),
-            this.prisma.paiement.count()
-        ]);
-        return { data: paiements, total, page, limit };
-    }
+  async findAll(
+  page: number = 1,
+  limit: number = 10,
+  professeurId?: number
+): Promise<{ data: Paiement[]; total: number; page: number; limit: number }> {
+
+    const skip = (page - 1) * limit;
+
+    const whereClause = professeurId
+        ? {
+            apprenant: {
+                formations: {
+                    some: {
+                        formation: {
+                            professeurId: professeurId
+                        }
+                    }
+                }
+            }
+        }
+        : {};
+
+    const [paiements, total] = await Promise.all([
+        this.prisma.paiement.findMany({
+            skip,
+            take: limit,
+            where: whereClause,
+            include: {
+                apprenant: {
+                    include: {
+                        utilisateur: true,
+                        formations: {
+                            include: {
+                                formation: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { datePaiement: 'desc' }
+        }),
+        this.prisma.paiement.count({ where: whereClause })
+    ]);
+
+    return { data: paiements, total, page, limit };
+}
 
     async findById(id: number): Promise<any> {
         return await this.prisma.paiement.findUnique({

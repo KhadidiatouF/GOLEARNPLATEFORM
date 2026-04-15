@@ -14,8 +14,10 @@ export class UtilisateurController{
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
+            const role = req.query.role as string | undefined;
+            const search = req.query.search as string | undefined;
             
-            const result = await utilisateurService.getAllUser(page, limit);
+            const result = await utilisateurService.getAllUser(page, limit, role, search);
             
             // Vérifier si le résultat existe (pas si le tableau est vide)
             if (result) {
