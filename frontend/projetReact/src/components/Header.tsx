@@ -80,8 +80,8 @@ const Header: React.FC = () => {
       <nav className="hidden md:flex gap-8">
         <Link to="/" className="text-sm font-medium hover:text-purple-600 transition-colors">Accueil</Link>
         <Link to="/formations" className="text-sm font-medium hover:text-purple-600 transition-colors">Formations</Link>
-        <a href="#" className="text-sm font-medium hover:text-purple-600 transition-colors">A propos</a>
-        <a href="#" className="text-sm font-medium hover:text-purple-600 transition-colors">Contact</a>
+        <Link to="/a-propos" className="text-sm font-medium hover:text-purple-600 transition-colors">A propos</Link>
+        <Link to="/contact" className="text-sm font-medium hover:text-purple-600 transition-colors">Contact</Link>
       </nav>
 
       {isAuthenticated && user ? (
@@ -128,8 +128,8 @@ const Header: React.FC = () => {
           <div className="flex flex-col p-4 gap-4">
             <Link to="/" className="text-sm font-medium hover:text-purple-600" onClick={() => setMobileMenuOpen(false)}>Accueil</Link>
             <Link to="/formations" className="text-sm font-medium hover:text-purple-600" onClick={() => setMobileMenuOpen(false)}>Formations</Link>
-            <a href="#" className="text-sm font-medium hover:text-purple-600">A propos</a>
-            <a href="#" className="text-sm font-medium hover:text-purple-600">Contact</a>
+            <Link to="/a-propos" className="text-sm font-medium hover:text-purple-600" onClick={() => setMobileMenuOpen(false)}>A propos</Link>
+            <Link to="/contact" className="text-sm font-medium hover:text-purple-600" onClick={() => setMobileMenuOpen(false)}>Contact</Link>
             <hr className="my-2" />
             {isAuthenticated && user ? (
               <>

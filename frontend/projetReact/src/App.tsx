@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
 import { AuthProvider } from './contexts/AuthContext';
 import Home from './pages/Home';
+import About from './pages/About';
+import Contact from './pages/Contact';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Formations from './pages/Formations';
@@ -10,6 +12,7 @@ import Paiement from './pages/Paiement';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfDashboard from './pages/ProfDashboard';
 import ApprenantDashboard from './pages/ApprenantDashboard';
+import DemandeFormateur from './pages/DemandeFormateur';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -18,11 +21,14 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/a-propos" element={<About />} />
+          <Route path="/contact" element={<Contact />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/formations" element={<Formations />} />
           <Route path="/formations/:id" element={<FormationDetail />} />
           <Route path="/paiement" element={<Paiement />} />
+          <Route path="/demande-formateur" element={<DemandeFormateur />} />
           
           {/* Routes protégées par profil */}
           <Route 

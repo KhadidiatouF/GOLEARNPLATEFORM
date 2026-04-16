@@ -19,54 +19,57 @@ export class PaiementService {
     }
 
     async createPaiement(data: any) {
-        // Créer le paiement
-        const paiement = await this.paiementRepo.create(data);
+        // Créer le paiement avec statut en attente
+        // AUCUN PARTAGE, AUCUN ACCES ICI
+        return await this.paiementRepo.create(data);
+    }
 
-        // Si le paiement est réussi, créditer le professeur
-            // Récupérer la formation pour obtenir le professeur
-            const formation = await this.prisma.formation.findUnique({
-                where: { id: data.formationId },
-                include: { professeur: { include: { utilisateur: true } } }
+    async confirmPaiement(data: any) {
+        // ✅ SEULEMENT ICI APRES CONFIRMATION WEBHOOK
+        // On ne fait le partage que quand Orange Money confirme le paiement
+        
+        // Récupérer la formation pour obtenir le professeur
+        const formation = await this.prisma.formation.findUnique({
+            where: { id: data.formationId },
+            include: { professeur: { include: { utilisateur: true } } }
+        });
+
+        if (formation && formation.professeur) {
+            // Calculer le partage des revenus (70% pour le professeur, 30% pour la plateforme)
+            const montant = typeof data.montant === 'number' ? data.montant : parseFloat(data.montant);
+            const partProfesseur = montant * 0.70;
+            const partPlateforme = montant * 0.30;
+
+            // ✅ Créditer le solde du professeur (70%)
+            await this.prisma.utilisateur.update({
+                where: { id: formation.professeur.utilisateurId },
+                data: {
+                    solde: {
+                        increment: partProfesseur
+                    }
+                }
             });
 
-            if (formation && formation.professeur) {
-                // Calculer le partage des revenus (70% pour le professeur, 30% pour la plateforme)
-                const montant = typeof data.montant === 'number' ? data.montant : parseFloat(data.montant);
-                const partProfesseur = montant * 0.70;
-                const partPlateforme = montant * 0.30;
-
-                // ✅ Créditer le solde du professeur (70%)
-                await this.prisma.utilisateur.update({
-                    where: { id: formation.professeur.utilisateurId },
-                    data: {
-                        solde: {
-                            increment: partProfesseur
-                        }
+            // ✅ Créditer le solde de l'administrateur (30%)
+            await this.prisma.utilisateur.updateMany({
+                where: { role: 'ADMIN' },
+                data: {
+                    solde: {
+                        increment: partPlateforme
                     }
-                });
+                }
+            });
 
-                // ✅ Créditer le solde de l'administrateur (30%)
-                await this.prisma.utilisateur.updateMany({
-                    where: { role: 'ADMIN' },
-                    data: {
-                        solde: {
-                            increment: partPlateforme
-                        }
-                    }
-                });
+            // ✅ Ajouter l'apprenant à la formation pour lui donner accès
+            await this.prisma.apprenantFormation.create({
+                data: {
+                    apprenantId: data.apprenantId,
+                    formationId: data.formationId
+                }
+            });
+        }
 
-                // ✅ Ajouter l'apprenant à la formation pour lui donner accès
-                // Sécurité: si formationId n'est pas dans data, le récupérer depuis la formation
-                const formationIdToAdd = data.formationId || formation.id;
-                
-                await this.prisma.apprenantFormation.create({
-                    data: {
-                        apprenantId: data.apprenantId,
-                        formationId: formationIdToAdd
-                    }
-                });
-            }
-        return paiement;
+        return true;
     }
 
     updatePaiement(id: number, data: any) {

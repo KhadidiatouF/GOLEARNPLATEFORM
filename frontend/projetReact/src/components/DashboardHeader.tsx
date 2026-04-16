@@ -37,6 +37,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const colors = colorMap[color];
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   const handleLogout = () => {
     logout();
@@ -58,7 +59,17 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
       </div>
 
       <div className="flex gap-4 items-center">
-        <div className="flex items-center gap-3">
+        {/* Bouton menu burger pour mobile */}
+        <button 
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="lg:hidden w-10 h-10 flex items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+        >
+          <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        <div className="hidden lg:flex items-center gap-3">
           <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
             <span className="font-semibold text-gray-700">
               {user?.name?.charAt(0).toUpperCase() || 'U'}
@@ -75,10 +86,38 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
         </div>
         <button 
           onClick={handleLogout}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+          className="hidden lg:block px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
         >
           Déconnexion
         </button>
+
+        {/* Menu burger déroulant mobile */}
+        {menuOpen && (
+          <div className="absolute top-full right-4 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[240px] z-50">
+            <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-3">
+              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                <span className="font-semibold text-gray-700 text-lg">
+                  {user?.name?.charAt(0).toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-800">
+                  {user?.name}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium inline-block w-fit ${colors.badge}`}>
+                  {user?.role ? roleLabels[user.role] : 'Utilisateur'}
+                </span>
+              </div>
+            </div>
+            
+            <button 
+              onClick={handleLogout}
+              className="w-full text-left px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+            >
+              Déconnexion
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

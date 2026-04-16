@@ -2,11 +2,18 @@
 const BASE_URL = "http://localhost:4004"; 
 
 export const apiUsers ={
-  getUsers : async () => {
+  getUsers : async (page: number = 1, limit: number = 10, search: string = '', role: string = '') => {
     const accessToken = localStorage.getItem('accessToken')
   try {
+    let url = `${BASE_URL}/users?page=${page}&limit=${limit}`;
+    if (search && search.trim()) {
+      url += `&search=${encodeURIComponent(search.trim())}`;
+    }
+    if (role && role.trim()) {
+      url += `&role=${encodeURIComponent(role.trim())}`;
+    }
 
-    const response = await fetch("/users",
+    const response = await fetch(url,
         {
             method: 'GET',
             headers:{'Authorization': `Bearer ${accessToken}`}
@@ -14,7 +21,7 @@ export const apiUsers ={
     console.log('Réponse API:', response.status, response.statusText);
     const result = await response.json();
     console.log('Données API:', result);
-    // Le backend retourne { success: true, data: [...], message: string }
+    // Le backend retourne { success: true, data: { users: [...], pagination: {...} }, message: string }
     return result.data || [];
   }catch (error) {
       console.error('Erreur lors du fetch des utilisateurs:', error);
@@ -39,6 +46,7 @@ export const apiUsers ={
     }
   },
 
+
   updateUser : async (id: number, updates: Record<string, unknown>) => {
     const accessToken = localStorage.getItem('accessToken')
 
@@ -56,12 +64,28 @@ export const apiUsers ={
  },
 
   deleteUser : async (id: number) => {
-        const accessToken = localStorage.getItem('accessToken')
+    const accessToken = localStorage.getItem('accessToken');
+    console.log('API deleteUser - ID:', id, 'Token:', accessToken);
 
     try {
-        await fetch(`${BASE_URL}/users/${id}`, { method: "DELETE", headers: {'Authorization': `Bearer ${accessToken}` }});
+      const response = await fetch(`${BASE_URL}/users/${id}`, { 
+        method: "DELETE", 
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        } 
+      });
+      console.log('Réponse suppression:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erreur API:', errorText);
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+      
+      return true;
     } catch (error) {
-        console.error(error);
+        console.error('Erreur lors de la suppression:', error);
         throw error;
     }
   },
@@ -94,10 +118,14 @@ export const apiUsers ={
   },
 
   createUsers: async (userData: Record<string, unknown>) => {
+    const accessToken = localStorage.getItem('accessToken');
     try {
       const res = await fetch(`${BASE_URL}/users`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            'Authorization': `Bearer ${accessToken}`
+          },
           body: JSON.stringify(userData)
       });
 
@@ -111,6 +139,25 @@ export const apiUsers ={
     } catch (err) {
       console.error("Erreur inscription:", err);
       return { success: false, error: "Impossible de contacter le serveur" };
+    }
+  },
+
+  // Récupérer le profil de l'utilisateur connecté (avec son solde)
+  getMonProfil: async () => {
+    const accessToken = localStorage.getItem('accessToken');
+
+    try {
+      const response = await fetch(`${BASE_URL}/users/moi`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+      if (!response.ok) throw new Error("Erreur lors du fetch du profil");
+      return await response.json();
+    } catch (error) {
+      console.error(error);
+      throw error;
     }
   }
 

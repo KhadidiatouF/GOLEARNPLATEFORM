@@ -1,27 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiUsers } from '../api/apiUsers';
+import { apiFormation } from '../api/apiFormation';
+import { apiAdministrateur } from '../api/apiAdministrateur';
 import DashboardHeader from '../components/DashboardHeader';
-import { Clock, Calendar, Bell, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Calendar, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  PointElement,
-  LineElement,
-  RadialLinearScale,
-  Filler,
-} from 'chart.js';
+import { Chart as ChartJS,CategoryScale,LinearScale,BarElement,Title,Tooltip, Legend, ArcElement, PointElement, LineElement, RadialLinearScale, Filler} from 'chart.js';
 import { Bar, Doughnut, Line, PolarArea } from 'react-chartjs-2';
 
-type TabType = 'overview' | 'users' | 'formations' | 'stats' | 'settings';
+type TabType = 'overview' | 'users' | 'formations' | 'stats' | 'revenus' | 'demandes' | 'settings';
 
 interface MenuItem {
   id: TabType;
@@ -67,6 +56,24 @@ const menuItems: MenuItem[] = [
     )
   },
   {
+    id: 'revenus',
+    label: 'Total Revenu',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    )
+  },
+  {
+    id: 'demandes',
+    label: 'Demandes Formateur',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    )
+  },
+  {
     id: 'settings',
     label: 'Paramètres',
     icon: (
@@ -85,20 +92,39 @@ export default function AdminDashboard() {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   // Gestion des formations en attente de validation
-  const [pendingCourses, setPendingCourses] = useState([
-    { id: 3, title: 'TypeScript Fundamentals', professor: 'Pr. Martin', description: 'Introduction à TypeScript', modules: 10, type: 'payant', submittedAt: '2026-02-15' },
-    { id: 4, title: 'Node.js Backend', professor: 'Pr. Martin', description: 'Créez des API avec Node.js', modules: 15, type: 'gratuit', submittedAt: '2026-02-18' },
-  ]);
-  const [validatedCourses, setValidatedCourses] = useState([
-    { id: 1, title: 'Introduction à React', professor: 'Pr. Martin', students: 45, modules: 12, type: 'payant' },
-    { id: 2, title: 'JavaScript Avancé', professor: 'Pr. Dupont', students: 32, modules: 8, type: 'gratuit' },
-  ]);
+  const [pendingCourses, setPendingCourses] = useState<Formation[]>([]);
+  const [validatedCourses, setValidatedCourses] = useState<Formation[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isUserDeleteDialogOpen, setIsUserDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<number | null>(null);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   
+  // Interface pour les formations
+  interface Formation {
+    id: number;
+    titre?: string;
+    title?: string;
+    image?: string;
+    professeur?: string | {
+      utilisateur?: {
+        nom?: string;
+        prenom?: string;
+        professeur?: {
+          nom?: string;
+          prenom?: string;
+        }
+      }
+    };
+    professor?: string;
+    description?: string;
+    modules?: number;
+    type?: string;
+    statut?: string;
+    students?: number;
+    submittedAt?: string;
+  }
+
   // Type pour les utilisateurs
   interface User {
     id: number;
@@ -107,55 +133,96 @@ export default function AdminDashboard() {
     email: string;
     login: string;
     role: string;
+    specialite?: string;
+    bio?: string;
+    niveau?: string;
+    apprenant?: { niveau?: string };
+    professeur?: { specialite?: string; bio?: string };
   }
 
   // Gestion des utilisateurs
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<{ id: number | undefined; nom: string; prenom: string; email: string; login: string; mdp?: string; role: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<{ id: number | undefined; nom: string; prenom: string; email: string; login: string; mdp?: string; role: string; specialite?: string; bio?: string; niveau?: string } | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
 
   // États pour la pagination et filtration des formations
   const [formationSearch, setFormationSearch] = useState('');
   const [formationFilterProf, setFormationFilterProf] = useState('');
   const [formationPage, setFormationPage] = useState(1);
-  const formationsPerPage = 6;
+  const formationsPerPage = 3;
 
   // États pour la pagination et filtration des utilisateurs
   const [userSearch, setUserSearch] = useState('');
   const [userFilterRole, setUserFilterRole] = useState('');
   const [userPage, setUserPage] = useState(1);
-  const usersPerPage = 10;
+  const [totalUsers, setTotalUsers] = useState(0);
+  const usersPerPage = 5;
+
+  // États pour les statistiques dynamiques
+  interface ChartItem {
+    mois?: string;
+    nombre?: number;
+    titre?: string;
+    inscrits?: number;
+    nom?: string;
+  }
+
+  interface Statistics {
+    general: {
+      users: number;
+      formations: number;
+      professors: number;
+      sessions: number;
+    };
+    charts: {
+      inscriptionsParMois: ChartItem[];
+      formationsPopulaires: ChartItem[];
+      evolutionUtilisateurs: ChartItem[];
+      repartitionCategorie: ChartItem[];
+    }
+  }
+
+  const [statistics, setStatistics] = useState<Statistics>({
+    general: {
+      users: 0,
+      formations: 0,
+      professors: 0,
+      sessions: 0
+    },
+    charts: {
+      inscriptionsParMois: [],
+      formationsPopulaires: [],
+      evolutionUtilisateurs: [],
+      repartitionCategorie: []
+    }
+  });
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
 
   // Données complètes à exporter (toutes les statistiques des graphiques)
   const exportData = {
     // Statistiques générales
-    general: {
-      users: 156,
-      formations: 42,
-      professors: 89,
-      sessions: 1234,
-    },
+    general: statistics.general,
     // Inscriptions par mois
     inscriptionsParMois: {
-      labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
-      data: [45, 78, 62, 91, 85, 120, 95, 110, 145, 132, 98, 75],
+      labels: statistics.charts.inscriptionsParMois.map(i => i.mois || ''),
+      data: statistics.charts.inscriptionsParMois.map(i => i.nombre || 0),
     },
     // Formations populaires
     formationsPopulaires: {
-      labels: ['React Avancé', 'JavaScript ES6+', 'TypeScript', 'Node.js', 'Python', 'CSS Avancé'],
-      data: [156, 142, 128, 98, 87, 65],
+      labels: statistics.charts.formationsPopulaires.map(f => f.titre || ''),
+      data: statistics.charts.formationsPopulaires.map(f => f.inscrits || 0),
     },
     // Evolution des utilisateurs
     evolutionUtilisateurs: {
-      labels: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'],
-      data: [120, 145, 168, 189, 210, 245, 278, 312, 356, 398, 425, 456],
+      labels: statistics.charts.evolutionUtilisateurs.map(e => e.mois || ''),
+      data: statistics.charts.evolutionUtilisateurs.map(e => e.nombre || 0),
     },
     // Repartition par catégorie
     repartitionCategorie: {
-      labels: ['Frontend', 'Backend', 'Mobile', 'Data Science', 'DevOps', 'Design'],
-      data: [320, 245, 180, 156, 132, 98],
+      labels: statistics.charts.repartitionCategorie.map(c => c.nom || ''),
+      data: statistics.charts.repartitionCategorie.map(c => c.nombre || 0),
     },
   };
 
@@ -282,24 +349,12 @@ export default function AdminDashboard() {
     setExportMenuOpen(false);
   };
 
-  const handleValidateCourse = (id: number) => {
-    const course = pendingCourses.find(c => c.id === id);
-    if (course) {
-      setValidatedCourses([...validatedCourses, { ...course, students: 0 }]);
-      setPendingCourses(pendingCourses.filter(c => c.id !== id));
-    }
+  const handleValidateCourse = async (id: number) => {
+    await handleValiderFormation(id);
   };
 
-  const handleRejectCourse = (id: number) => {
-    setPendingCourses(pendingCourses.filter(c => c.id !== id));
-  };
-
-  const handleDeleteCourse = () => {
-    if (courseToDelete) {
-      setValidatedCourses(validatedCourses.filter(c => c.id !== courseToDelete));
-      setCourseToDelete(null);
-      setIsDeleteDialogOpen(false);
-    }
+  const handleRejectCourse = async (id: number) => {
+    await handleRejeterFormation(id);
   };
 
   const confirmDelete = (id: number) => {
@@ -309,11 +364,11 @@ export default function AdminDashboard() {
 
   // Handlers pour la gestion des utilisateurs
   const handleAddUser = () => {
-    setEditingUser({ id: undefined, nom: '', prenom: '', email: '', login: '', mdp: '', role: 'APPRENANT' });
+    setEditingUser({ id: undefined, nom: '', prenom: '', email: '', login: '', mdp: '', role: 'APPRENANT', specialite: '', bio: '', niveau: '' });
     setIsUserModalOpen(true);
   };
 
-  const handleEditUser = (user: { id: number; nom: string; prenom: string; email: string; login: string; mdp?: string; role: string }) => {
+  const handleEditUser = (user: { id: number; nom: string; prenom: string; email: string; login: string; mdp?: string; role: string; specialite?: string; bio?: string; niveau?: string }) => {
     setEditingUser(user);
     setIsUserModalOpen(true);
   };
@@ -323,28 +378,105 @@ export default function AdminDashboard() {
     setIsUserDeleteDialogOpen(true);
   };
 
-  const confirmDeleteUser = () => {
+  const confirmDeleteUser = async () => {
     if (userToDelete) {
-      setUsers(users.filter(u => u.id !== userToDelete));
-      setUserToDelete(null);
-      setIsUserDeleteDialogOpen(false);
+      try {
+        const accessToken = localStorage.getItem('accessToken');
+        console.log('Token:', accessToken);
+        console.log('Suppression utilisateur ID:', userToDelete);
+        
+        await apiUsers.deleteUser(userToDelete);
+        console.log('Suppression réussie');
+        
+        setUsers(users.filter(u => u.id !== userToDelete));
+        setUserToDelete(null);
+        setIsUserDeleteDialogOpen(false);
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        alert('Erreur lors de la suppression');
+      }
     }
   };
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  // Confirmer suppression formation
+  const confirmDeleteFormation = async () => {
+    if (courseToDelete) {
+      try {
+        await apiFormation.deleteFormation(courseToDelete);
+        await fetchFormations();
+        setCourseToDelete(null);
+        setIsDeleteDialogOpen(false);
+      } catch (error) {
+        console.error('Erreur lors de la suppression de la formation:', error);
+        alert('Erreur lors de la suppression de la formation');
+      }
+    }
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingUser) {
-      if (editingUser.id) {
-        // Modifier un utilisateur existant
-        const updatedUser = { ...editingUser, id: editingUser.id };
-        setUsers(users.map(u => u.id === editingUser.id ? updatedUser : u));
-      } else {
-        // Ajouter un nouvel utilisateur
-        const newUser = { ...editingUser, id: Date.now() };
-        setUsers([...users, newUser]);
+      try {
+        if (editingUser.id) {
+          // Modifier un utilisateur existant
+          const userData: Record<string, unknown> = {
+            nom: editingUser.nom,
+            prenom: editingUser.prenom,
+            email: editingUser.email,
+            login: editingUser.login,
+            role: editingUser.role
+          };
+          
+          // Ajouter les champs optionnels seulement s'ils ont une valeur
+          if (editingUser.role === 'PROF' && editingUser.specialite) {
+            userData.specialite = editingUser.specialite;
+          }
+          if (editingUser.role === 'PROF' && editingUser.bio) {
+            userData.bio = editingUser.bio;
+          }
+          if (editingUser.role === 'APPRENANT' && editingUser.niveau) {
+            userData.niveau = editingUser.niveau;
+          }
+          // N'envoyer le mot de passe SEULEMENT si il a été modifié
+          if (editingUser.mdp && editingUser.mdp.trim() !== '') {
+            userData.mdp = editingUser.mdp;
+          }
+          
+          await apiUsers.updateUser(editingUser.id, userData);
+          setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...userData, id: editingUser.id } : u));
+        } else {
+          // Ajouter un nouvel utilisateur (sans id pour la création)
+          // Ne pas envoyer les champs optionnels s'ils sont null ou undefined
+          const userData: Record<string, unknown> = { 
+            nom: editingUser.nom, 
+            prenom: editingUser.prenom, 
+            email: editingUser.email, 
+            login: editingUser.login, 
+            mdp: editingUser.mdp, 
+            role: editingUser.role
+          };
+          
+          // Ajouter les champs optionnels seulement s'ils ont une valeur
+          if (editingUser.role === 'PROF' && editingUser.specialite) {
+            userData.specialite = editingUser.specialite;
+          }
+          if (editingUser.role === 'PROF' && editingUser.bio) {
+            userData.bio = editingUser.bio;
+          }
+          if (editingUser.role === 'APPRENANT' && editingUser.niveau) {
+            userData.niveau = editingUser.niveau;
+          }
+          
+          await apiUsers.createUsers(userData);
+          // Recharger les utilisateurs pour obtenir l'id généré
+          fetchUsers(userPage);
+        }
+        setIsUserModalOpen(false);
+        setEditingUser(null);
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        alert('Erreur lors de la sauvegarde');
       }
-      setIsUserModalOpen(false);
-      setEditingUser(null);
     }
   };
 
@@ -357,26 +489,121 @@ export default function AdminDashboard() {
   }, []);
 
   // Charger les utilisateurs depuis l'API
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const usersData = await apiUsers.getUsers();
-        console.log('Données reçues:', usersData);
-        // Les données viennent du backend directement dans le bon format
-        if (usersData && Array.isArray(usersData)) {
-          setUsers(usersData);
-        } else {
-          console.log('Format de données inattendu:', usersData);
-        }
-      } catch (error) {
-        console.error('Erreur lors du chargement des utilisateurs:', error);
-      } finally {
-        setUsersLoading(false);
+  const fetchUsers = async (page: number = 1, search: string = '', role: string = '') => {
+    setUsersLoading(true);
+    try {
+      const usersData = await apiUsers.getUsers(page, usersPerPage, search, role);
+      console.log('Données reçues:', usersData);
+      if (usersData && usersData.users && Array.isArray(usersData.users)) {
+        const usersWithExtraFields = usersData.users.map((user: User) => ({
+          ...user,
+          niveau: user.apprenant?.niveau || '',
+          specialite: user.professeur?.specialite || '',
+          bio: user.professeur?.bio || ''
+        }));
+        setUsers(usersWithExtraFields);
+        setTotalUsers(usersData.pagination?.total || usersWithExtraFields.length);
+      } else {
+        console.log('Format de données inattendu:', usersData);
       }
-    };
+    } catch (error) {
+      console.error('Erreur lors du chargement des utilisateurs:', error);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
-    fetchUsers();
-  }, []);
+  // Charger les statistiques
+  const fetchStatistics = async () => {
+    setStatisticsLoading(true);
+    try {
+      const data = await apiAdministrateur.getStatistics();
+      setStatistics(data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des statistiques:', error);
+    } finally {
+      setStatisticsLoading(false);
+    }
+  };
+
+  // Charger les formations depuis l'API
+  const fetchFormations = async () => {
+    try {
+      const response = await apiFormation.getFormations();
+      // L'API retourne un objet avec la propriété data contenant le tableau
+      const data = response.data || response;
+
+      if (Array.isArray(data)) {
+        // Mapper les champs pour adapter le format de la base de données au format attendu par le frontend
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const mappedFormations = data.map((f: any) => ({
+          ...f,
+          // Mapper le titre : base de données utilise 'titre', frontend utilise 'title'
+          title: f.titre || f.title || '',
+          // Mapper le nom et prénom complet du professeur
+          professor: typeof f.professeur === 'object' 
+            ? `${f.professeur?.utilisateur?.prenom || ''} ${f.professeur?.utilisateur?.nom || ''}`.trim() 
+              || `${f.professeur?.utilisateur?.professeur?.prenom || ''} ${f.professeur?.utilisateur?.professeur?.nom || ''}`.trim()
+              || 'Professeur inconnu'
+            : f.professor || f.professeur || 'Professeur inconnu'
+        }));
+
+        // Séparer les formations validées et en attente
+        const pending = mappedFormations.filter((f: Formation) => f.statut && f.statut.toUpperCase() === 'EN_ATTENTE');
+        const validated = mappedFormations.filter((f: Formation) => !f.statut || f.statut.toUpperCase() === 'VALIDEE');
+
+        setPendingCourses(pending);
+        setValidatedCourses(validated);
+      } else {
+        setPendingCourses([]);
+        setValidatedCourses([]);
+      }
+    } catch (error) {
+      console.error(' Erreur lors du chargement des formations:', error);
+      setPendingCourses([]);
+      setValidatedCourses([]);
+    }
+  };
+
+  // Valider une formation
+  const handleValiderFormation = async (formationId: number) => {
+    try {
+      await apiFormation.validerFormation(formationId);
+      // Recharger la liste des formations après validation
+      await fetchFormations();
+    } catch (error) {
+      console.error('Erreur lors de la validation de la formation:', error);
+    }
+  };
+
+  // Rejeter une formation
+  const handleRejeterFormation = async (formationId: number) => {
+    try {
+      await apiFormation.rejeterFormation(formationId);
+      // Recharger la liste des formations après rejet
+      await fetchFormations();
+    } catch (error) {
+      console.error('Erreur lors du rejet de la formation:', error);
+    }
+  };
+
+
+
+  // Charger les utilisateurs et statistiques au montage du composant
+  useEffect(() => {
+    fetchUsers(userPage, userSearch, userFilterRole);
+    fetchStatistics();
+    fetchFormations();
+
+    // Rafraichir automatiquement les statistiques toutes les 30 secondes
+    const interval = setInterval(() => {
+      fetchStatistics();
+      fetchFormations();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [userPage, userSearch, userFilterRole]);
+
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('fr-FR', { 
@@ -423,7 +650,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
         return (
           <div className="space-y-6">
             {/* Carte principale avec texte et image */}
-            <div className="w-full rounded-xl shadow-lg bg-linear-to-r from-purple-600 to-indigo-700 p-6 md:p-8">
+            <div className="w-full rounded-xl shadow-lg bg-purple-600 p-6 md:p-8">
               <div className="flex flex-col md:flex-row items-center justify-between">
                 {/* Texte à gauche */}
                 <div className="text-white mb-4 md:mb-0">
@@ -446,41 +673,41 @@ const getFirstDayOfMonth = (year: number, month: number) => {
             </div>
             
             {/* Les 4 cartes de statistiques */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-blue-100 rounded-full">
                     <Users className="w-6 h-6 text-blue-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-purple-700">156</h3>
+                <h3 className="text-3xl font-bold text-purple-700">{statisticsLoading ? '...' : statistics.general.users}</h3>
                 <p className="text-purple-600 font-medium">Utilisateurs total</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-green-100 rounded-full">
                     <BookOpen className="w-6 h-6 text-green-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-purple-700">42</h3>
+                <h3 className="text-3xl font-bold text-purple-700">{statisticsLoading ? '...' : statistics.general.formations}</h3>
                 <p className="text-purple-600 font-medium">Formations actives</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-orange-100 rounded-full">
                     <GraduationCap className="w-6 h-6 text-orange-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-purple-700">89</h3>
+                <h3 className="text-3xl font-bold text-purple-700">{statisticsLoading ? '...' : statistics.general.professors}</h3>
                 <p className="text-purple-600 font-medium">Professeurs</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-purple-100 rounded-full">
                     <Calendar className="w-6 h-6 text-purple-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-purple-700">1,234</h3>
+                <h3 className="text-3xl font-bold text-purple-700">{statisticsLoading ? '...' : statistics.general.sessions.toLocaleString()}</h3>
                 <p className="text-purple-600 font-medium">Sessions ce mois</p>
               </div>
             </div>
@@ -551,29 +778,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                   </p>
                 </div>
 
-                {/* Liste des Reminders */}
-                <div className="bg-white rounded-xl shadow-lg p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-red-100 rounded-full">
-                      <Bell className="w-6 h-6 text-red-600" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-800">Rappels</h3>
-                  </div>
-                  <ul className="space-y-3">
-                    {[
-                      { title: 'Réunion équipe', time: '14:00', color: 'bg-blue-100 text-blue-700' },
-                      { title: 'Mise à jour des formations', time: '16:30', color: 'bg-yellow-100 text-yellow-700' },
-                      { title: 'Rapport mensuel', time: 'Demain', color: 'bg-green-100 text-green-700' },
-                    ].map((reminder, idx) => (
-                      <li key={idx} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                        <span className="text-gray-700 font-medium">{reminder.title}</span>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${reminder.color}`}>
-                          {reminder.time}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+            
               </div>
 
               {/* Calendrier à droite */}
@@ -651,30 +856,21 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                 <select
                   value={userFilterRole}
                   onChange={(e) => { setUserFilterRole(e.target.value); setUserPage(1); }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                 >
                   <option value="">Tous les rôles</option>
-                  <option value="professeur">Professeur</option>
-                  <option value="apprenant">Apprenant</option>
+                  <option value="PROF">Professeur</option>
+                  <option value="APPRENANT">Apprenant</option>
                 </select>
               </div>
             </div>
 
-            {/* Utilisateurs filtrés */}
+             {/* Utilisateurs filtrés */}
             {(() => {
-              const filteredUsers = users.filter(user => {
-                const matchesSearch = 
-                  user.nom.toLowerCase().includes(userSearch.toLowerCase()) ||
-                  user.prenom.toLowerCase().includes(userSearch.toLowerCase()) ||
-                  user.email.toLowerCase().includes(userSearch.toLowerCase());
-                const matchesRole = !userFilterRole || user.role === userFilterRole;
-                return matchesSearch && matchesRole;
-              });
-              const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
-              const paginatedUsers = filteredUsers.slice(
-                (userPage - 1) * usersPerPage,
-                userPage * usersPerPage
-              );
+               // ✅ Le filtre et la recherche sont appliqués COTE SERVEUR avant pagination
+               const filteredUsers = users;
+               const totalPages = Math.ceil(totalUsers / usersPerPage);
+               const paginatedUsers = filteredUsers;
               
               return (
                 <>
@@ -860,8 +1056,14 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                   >
                     <option value="">Tous les professeurs</option>
-                    <option value="Pr. Martin">Pr. Martin</option>
-                    <option value="Pr. Dupont">Pr. Dupont</option>
+                    {/* Extraire dynamiquement les professeurs depuis les formations */}
+                    {[...new Set(validatedCourses.map(f => f.professor))]
+                      .filter(name => name && name !== 'Professeur inconnu')
+                      .map(professorName => (
+                        <option key={professorName} value={professorName}>
+                          {professorName}
+                        </option>
+                      ))}
                   </select>
                 </div>
               </div>
@@ -869,7 +1071,8 @@ const getFirstDayOfMonth = (year: number, month: number) => {
               {/* Formations filtrées */}
               {(() => {
                 const filteredCourses = validatedCourses.filter(course => {
-                  const matchesSearch = course.title.toLowerCase().includes(formationSearch.toLowerCase());
+                  const courseTitle = course.titre || course.title || '';
+                  const matchesSearch = courseTitle.toLowerCase().includes(formationSearch.toLowerCase());
                   const matchesProf = !formationFilterProf || course.professor === formationFilterProf;
                   return matchesSearch && matchesProf;
                 });
@@ -884,7 +1087,22 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {paginatedCourses.map((course) => (
                         <div key={course.id} className="border rounded-xl p-4 hover:shadow-lg transition-shadow">
-                          <div className="h-32 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-lg mb-4"></div>
+                          <div className="h-32 rounded-lg mb-4 overflow-hidden bg-gray-100">
+                            {course.image ? (
+                              <img 
+                                src={course.image} 
+                                alt={course.title} 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="h-full bg-gradient-to-br from-purple-400 to-indigo-500 flex items-center justify-center">
+                                <BookOpen className="w-12 h-12 text-white/50" />
+                              </div>
+                            )}
+                          </div>
                           <h3 className="font-semibold mb-1">{course.title}</h3>
                           <p className="text-sm text-gray-500 mb-2">{course.professor}</p>
                           <p className="text-sm text-gray-600 mb-3">{course.students} apprenants • {course.modules} modules</p>
@@ -971,30 +1189,6 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                 </div>
               </form>
             </Modal>
-
-            {/* Dialog de confirmation de suppression */}
-            <ConfirmDialog
-              isOpen={isDeleteDialogOpen}
-              title="Supprimer la formation"
-              message="Êtes-vous sûr de vouloir supprimer cette formation ? Cette action est irréversible."
-              confirmText="Supprimer"
-              cancelText="Annuler"
-              onConfirm={handleDeleteCourse}
-              onCancel={() => setIsDeleteDialogOpen(false)}
-              type="danger"
-            />
-
-            {/* Dialog de confirmation de suppression utilisateur */}
-            <ConfirmDialog
-              isOpen={isUserDeleteDialogOpen}
-              title="Supprimer l'utilisateur"
-              message="Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible."
-              confirmText="Supprimer"
-              cancelText="Annuler"
-              onConfirm={confirmDeleteUser}
-              onCancel={() => setIsUserDeleteDialogOpen(false)}
-              type="danger"
-            />
 
           </div>
         );
@@ -1295,6 +1489,76 @@ const getFirstDayOfMonth = (year: number, month: number) => {
         );
       }
 
+      case 'revenus':
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium">Total Revenu Plateforme</p>
+                    <h3 className="text-3xl font-bold text-gray-800 mt-1">
+                      { (user?.solde || 0).toFixed(2) } FCFA
+                    </h3>
+                    <p className="text-purple-600 text-sm mt-1">30% sur toutes les ventes</p>
+                  </div>
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center">
+                    <span className="text-3xl">💰</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium">Total Réversé Professeurs</p>
+                    <h3 className="text-3xl font-bold text-gray-800 mt-1">
+                      { ((user?.solde || 0) * 70 / 30).toFixed(2) } FCFA
+                    </h3>
+                    <p className="text-blue-600 text-sm mt-1">70% part des créateurs</p>
+                  </div>
+                  <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-3xl">👨🏫</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 text-sm font-medium">Chiffre d'affaire Total Brut</p>
+                    <h3 className="text-3xl font-bold text-gray-800 mt-1">
+                      { ((user?.solde || 0) * 100 / 30).toFixed(2) } FCFA
+                    </h3>
+                    <p className="text-purple-600 text-sm mt-1">Somme de toutes les transactions</p>
+                  </div>
+                  <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
+                    <span className="text-3xl">📊</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <h2 className="text-xl font-semibold mb-6">Comment ça marche ?</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-4xl font-bold text-green-600">30%</div>
+                  <p className="text-gray-600 mt-2">Commission plateforme sur chaque formation vendue</p>
+                </div>
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-4xl font-bold text-blue-600">70%</div>
+                  <p className="text-gray-600 mt-2">Revenu reversé automatiquement au professeur créateur</p>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-lg">
+                  <div className="text-4xl font-bold text-gray-700">100%</div>
+                  <p className="text-gray-600 mt-2">Prix payé par l'apprenant</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
       case 'settings':
         return (
           <div className="bg-white rounded-lg shadow p-6">
@@ -1320,6 +1584,181 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                 </button>
               </div>
             </div>
+          </div>
+        );
+
+      case 'demandes':
+        return (
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Demandes de formateurs</h2>
+                  <p className="text-gray-500 text-sm">Gérez les demandes d'inscription</p>
+                </div>
+              </div>
+            </div>
+            {(() => {
+              const demandes = JSON.parse(localStorage.getItem('demandesFormateur') || '[]');
+              const pendingDemandes = demandes.filter((d: { statut: string }) => d.statut === 'en_attente');
+              const approvedDemandes = demandes.filter((d: { statut: string }) => d.statut === 'approuve');
+              const rejectedDemandes = demandes.filter((d: { statut: string }) => d.statut === 'rejete');
+
+              const handleValide = (id: number) => {
+                const updatedDemandes = demandes.map((d: { id: number }) => 
+                  d.id === id ? { ...d, statut: 'approuve' } : d
+                );
+                localStorage.setItem('demandesFormateur', JSON.stringify(updatedDemandes));
+                window.location.reload();
+              };
+
+              const handleReject = (id: number) => {
+                const updatedDemandes = demandes.map((d: { id: number }) => 
+                  d.id === id ? { ...d, statut: 'rejete' } : d
+                );
+                localStorage.setItem('demandesFormateur', JSON.stringify(updatedDemandes));
+                window.location.reload();
+              };
+
+              const domaineLabels: { [key: string]: string } = {
+                developpement_web: 'Développement Web',
+                developpement_mobile: 'Développement Mobile',
+                data_science: 'Data Science',
+                machine_learning: 'Machine Learning',
+                cybersecurite: 'Cybersécurité',
+                design: 'Design UI/UX',
+                marketing: 'Marketing Digital',
+                gestion_projet: 'Gestion de Projet',
+                langues: 'Langues',
+                autre: 'Autre'
+              };
+
+              return (
+                <div className="space-y-8">
+                  {/* En attente */}
+                  <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-5 border border-orange-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">{pendingDemandes.length}</span>
+                      </div>
+                      <h3 className="font-semibold text-lg text-orange-800">Demandes en attente</h3>
+                    </div>
+                    {pendingDemandes.length === 0 ? (
+                      <div className="text-center py-8 text-orange-600">
+                        <svg className="w-12 h-12 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p>Aucune demande en attente</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {pendingDemandes.map((demande: { id: number; nom: string; prenom: string; email: string; domaineExpertise: string; experience: string; motivation: string; date: string }) => (
+                          <div key={demande.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                                  {demande.nom?.charAt(0).toUpperCase()}{demande.prenom?.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-gray-800">{demande.nom} {demande.prenom}</h4>
+                                  <p className="text-xs text-gray-500">{demande.email}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="space-y-2 mb-4">
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">{domaineLabels[demande.domaineExpertise] || demande.domaineExpertise}</span>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-gray-600">{demande.experience} ans</span>
+                              </div>
+                              <p className="text-sm text-gray-600 line-clamp-2">{demande.motivation}</p>
+                              <p className="text-xs text-gray-400">{new Date(demande.date).toLocaleDateString('fr-FR')}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={() => handleValide(demande.id)} className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Valider
+                              </button>
+                              <button onClick={() => handleReject(demande.id)} className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                                Rejeter
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Approuvées */}
+                  <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-5 border border-green-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">{approvedDemandes.length}</span>
+                      </div>
+                      <h3 className="font-semibold text-lg text-green-800">Demandes approuvées</h3>
+                    </div>
+                    {approvedDemandes.length === 0 ? (
+                      <p className="text-green-600 text-center py-4">Aucune demande approuvée</p>
+                    ) : (
+                      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {approvedDemandes.map((demande: { id: number; nom: string; prenom: string; email: string; domaineExpertise: string }) => (
+                          <div key={demande.id} className="bg-white rounded-lg shadow-sm p-3 flex items-center gap-3">
+                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-800 truncate">{demande.nom} {demande.prenom}</p>
+                              <p className="text-xs text-gray-500 truncate">{demande.email}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Rejetées */}
+                  <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-5 border border-red-200">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold text-sm">{rejectedDemandes.length}</span>
+                      </div>
+                      <h3 className="font-semibold text-lg text-red-800">Demandes rejetées</h3>
+                    </div>
+                    {rejectedDemandes.length === 0 ? (
+                      <p className="text-red-600 text-center py-4">Aucune demande rejetée</p>
+                    ) : (
+                      <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {rejectedDemandes.map((demande: { id: number; nom: string; prenom: string; email: string }) => (
+                          <div key={demande.id} className="bg-white rounded-lg shadow-sm p-3 flex items-center gap-3">
+                            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-800 truncate">{demande.nom} {demande.prenom}</p>
+                              <p className="text-xs text-gray-500 truncate">{demande.email}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         );
     }
@@ -1407,12 +1846,77 @@ const getFirstDayOfMonth = (year: number, month: number) => {
               required={!editingUser?.id}
             />
           </div>
+          {/* Champs spécifiques au professeur - affichés seulement si rôle est PROF */}
+          {editingUser?.role === 'PROF' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Spécialité</label>
+                <input
+                  type="text"
+                  value={editingUser?.specialite || ''}
+                  onChange={(e) => setEditingUser(editingUser ? { ...editingUser, specialite: e.target.value } : null)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Ex: Développement Web, Mathématiques..."
+                  required={editingUser?.role === 'PROF'}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                <input
+                  type="text"
+                  value={editingUser?.bio || ''}
+                  onChange={(e) => setEditingUser(editingUser ? { ...editingUser, bio: e.target.value } : null)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Présentez-vous en quelques mots..."
+                  required={editingUser?.role === 'PROF'}
+                />
+              </div>
+            </div>
+          )}
+          {/* Champ spécifique à l'apprenant - affiché seulement si rôle est APPRENANT */}
+          {editingUser?.role === 'APPRENANT' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Niveau</label>
+              <select
+                value={editingUser?.niveau || ''}
+                onChange={(e) => setEditingUser(editingUser ? { ...editingUser, niveau: e.target.value } : null)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="">Sélectionner un niveau</option>
+                <option value="debutant">Débutant</option>
+                <option value="intermediare">Intermédiaire</option>
+                <option value="avance">Avancé</option>
+              </select>
+            </div>
+          )}
           <div className="flex gap-3 pt-4">
             <button type="button" onClick={() => setIsUserModalOpen(false)} className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200">Annuler</button>
             <button type="submit" className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700">{editingUser?.id ? 'Modifier' : 'Ajouter'}</button>
           </div>
         </form>
       </Modal>
+      {/* Dialog de confirmation de suppression */}
+      <ConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        title="Supprimer la formation"
+        message="Êtes-vous sûr de vouloir supprimer cette formation ? Cette action est irréversible."
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        onConfirm={confirmDeleteFormation}
+        onCancel={() => setIsDeleteDialogOpen(false)}
+        type="danger"
+      />
+      {/* Dialog de confirmation de suppression utilisateur */}
+      <ConfirmDialog
+        isOpen={isUserDeleteDialogOpen}
+        title="Supprimer l'utilisateur"
+        message="Êtes-vous sûr de vouloir supprimer cet utilisateur ? Cette action est irréversible."
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        onConfirm={confirmDeleteUser}
+        onCancel={() => setIsUserDeleteDialogOpen(false)}
+        type="danger"
+      />
     </>
   );
 
@@ -1492,8 +1996,8 @@ const getFirstDayOfMonth = (year: number, month: number) => {
       </aside>
 
       {/* Mobile bottom navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-40">
-        <div className="flex justify-around items-center py-2">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 z-40 overflow-x-auto">
+        <div className="flex items-center py-2 px-2 gap-1 min-w-max">
           {menuItems.map((item) => (
             <button
               key={item.id}

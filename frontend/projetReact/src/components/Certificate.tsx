@@ -51,7 +51,6 @@ export const CertificateContent: React.FC<{ courseName: string; completionDate: 
         flexDirection: 'column',
         alignItems: 'center',
         textAlign: 'center',
-        backgroundImage: 'linear-gradient(135deg, #fdfcfb 0%, #e2d1c3 100%)',
         boxSizing: 'border-box'
       }}
     >

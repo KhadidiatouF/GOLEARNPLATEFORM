@@ -38,12 +38,13 @@ const Formations: React.FC = () => {
   const [formations, setFormations] = useState<Formation[]>(defaultFormations);
   const [loading, setLoading] = useState(false);
 
-  // Charger les formations depuis l'API
+  // Charger les formations depuis l'API (endpoint public)
   useEffect(() => {
     const loadFormations = async () => {
       try {
         setLoading(true);
-        const response = await apiFormation.getFormations();
+        // Appel de l'endpoint public - pas besoin d'authentification
+        const response = await apiFormation.getFormationsPubliques();
         if (response && response.data) {
           // Transformer les données de l'API
           const formattedFormations: Formation[] = response.data.map((f: FormationData) => ({
@@ -164,9 +165,9 @@ const Formations: React.FC = () => {
       <section className="py-20">
         <div className="container mx-auto px-6">
           <div className="flex items-center gap-4 mb-12">
-            <div className="h-1 flex-1 bg-green-500 rounded"></div>
+            <div className="h-1 flex-1 bg-purple-500 rounded"></div>
             <h2 className="text-3xl font-bold text-gray-800">Formations Gratuites</h2>
-            <div className="h-1 flex-1 bg-green-500 rounded"></div>
+            <div className="h-1 flex-1 bg-purple-500 rounded"></div>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -178,8 +179,8 @@ const Formations: React.FC = () => {
                     alt={formation.titre}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                  <div className="absolute top-4 right-4 bg-green-500 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
+                  <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent"></div>
+                  <div className="absolute top-4 right-4 bg-purple-500 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
                     Gratuit
                   </div>
                 </div>
@@ -195,7 +196,7 @@ const Formations: React.FC = () => {
                     {getFeatures(formation.id).slice(0, 4).map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2 text-sm text-gray-600">
                         <div className="w-5 h-5 rounded-full bg-green-50 flex items-center justify-center">
-                          <Check className="w-3 h-3 text-green-500" />
+                          <Check className="w-3 h-3 text-purple-500" />
                         </div>
                         {feature}
                       </li>
@@ -203,7 +204,7 @@ const Formations: React.FC = () => {
                   </ul>
                   <button 
                     onClick={() => handleFreeEnrollment(formation)}
-                    className="w-full bg-green-500 text-white py-4 rounded-xl font-semibold hover:bg-green-600 transition cursor-pointer shadow-lg hover:shadow-xl"
+                    className="w-full bg-purple-500 text-white py-4 rounded-xl font-semibold hover:bg-purple-600 transition cursor-pointer shadow-lg hover:shadow-xl"
                   >
                     Commencer la formation
                   </button>
@@ -219,7 +220,7 @@ const Formations: React.FC = () => {
         <div className="container mx-auto px-6">
           <div className="flex items-center gap-4 mb-12">
             <div className="h-1 flex-1 bg-purple-600 rounded"></div>
-            <h2 className="text-3xl font-bold text-gray-800">Formations Premium</h2>
+            <h2 className="text-3xl font-bold text-gray-800">Formations Payantes</h2>
             <div className="h-1 flex-1 bg-purple-600 rounded"></div>
           </div>
           
@@ -233,7 +234,7 @@ const Formations: React.FC = () => {
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent"></div>
-                  <div className="absolute top-4 right-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
+                  <div className="absolute top-4 right-4 bg-purple-600 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg">
                     {formation.prix.toLocaleString()} CFA
                   </div>
                   <div className="absolute bottom-4 left-4">
@@ -261,12 +262,12 @@ const Formations: React.FC = () => {
                   
                   {/* Prix et bouton payer */}
                   <div className="mb-4">
-                    <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">{formation.prix.toLocaleString()} CFA</div>
+                    <div className="text-3xl font-bold bg-purple-600  bg-clip-text text-transparent">{formation.prix.toLocaleString()} CFA</div>
                   </div>
                   
                   <button 
                     onClick={() => handleOpenPayment(formation)}
-                    className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-indigo-700 transition cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                    className="w-full bg-purple-600  text-white py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-purple-700 transition cursor-pointer flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
                   >
                     Payer maintenant
                   </button>

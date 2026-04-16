@@ -9,7 +9,6 @@ interface RegisterErrors {
   login?: string;
   mdp?: string;
   confirmMdp?: string;
-  role?: string;
 }
 
 export default function Register() {
@@ -19,8 +18,7 @@ export default function Register() {
     email: '',
     login: '',
     mdp: '',
-    confirmMdp: '',
-    role: 'APPRENANT' as 'ADMIN' | 'PROF' | 'APPRENANT'
+    confirmMdp: ''
   });
   const [errors, setErrors] = useState<RegisterErrors>({});
   const [isAnimating, setIsAnimating] = useState(false);
@@ -88,10 +86,6 @@ export default function Register() {
       newErrors.confirmMdp = 'Les mots de passe ne correspondent pas';
     }
     
-    if (!formData.role) {
-      newErrors.role = 'Le rôle est requis';
-    }
-    
     setErrors(newErrors);
     
     // Si pas d'erreurs, soumettre le formulaire
@@ -106,8 +100,8 @@ export default function Register() {
           email: formData.email,
           login: formData.login,
           mdp: formData.mdp,
-          role: formData.role,
-          solde: 0 // Valeur par défaut
+          role: 'APPRENANT' as const,
+          solde: 0
         };
 
         const result = await apiUsers.createUsers(userData);
@@ -209,22 +203,6 @@ export default function Register() {
                 className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${errors.login ? 'border-red-500' : 'border-gray-300'}`}
               />
               {errors.login && <p className="text-red-500 text-sm mt-1">{errors.login}</p>}
-            </div>
-            
-            <div className="mb-4">
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
-              <select
-                id="role"
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 ${errors.role ? 'border-red-500' : 'border-gray-300'}`}
-              >
-                <option value="APPRENANT">Apprenant</option>
-                <option value="PROF">Professeur</option>
-                <option value="ADMIN">Administrateur</option>
-              </select>
-              {errors.role && <p className="text-red-500 text-sm mt-1">{errors.role}</p>}
             </div>
             
             <div className="mb-4">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiCertif } from '../api/apiCertif';
+import { apiApprenant } from '../api/apiApprenant';
 import DashboardHeader from '../components/DashboardHeader';
 import Certificate from '../components/Certificate';
 import CourseViewer from '../components/Courseviewer';
@@ -24,14 +25,17 @@ interface CertificateData {
   };
 }
 
+// Type pour les formations inscription (utilisé par le dashboard)
 interface EnrolledFormation {
   id: number;
   title: string;
   professor: string;
   duration: string;
-  image: string;
+  image: string | null;
   dateInscription: string;
   progress: number;
+  price: number;
+  typeCours: string;
 }
 
 // Les données d formations seront chargées depuis localStorage (inscriptions)
@@ -70,6 +74,35 @@ export default function ApprenantDashboard() {
 
   // ── ÉTAT pour la formation sélectionnée ──
   const [selectedFormation, setSelectedFormation] = useState<number | null>(null);
+  
+  // State pour les formations réelses de l'apprenant
+  const [enrolledFormations, setEnrolledFormations] = useState<EnrolledFormation[]>([]);
+  const [loadingFormations, setLoadingFormations] = useState(true);
+
+  // Charger les formations depuis l'API
+  useEffect(() => {
+    const loadFormations = async () => {
+      try {
+        setLoadingFormations(true);
+        if (user?.id) {
+          const response = await apiApprenant.getFormationsWithProgress(user.id);
+          console.log('✅ Réponse formations:', response);
+          // ✅ Corriger l'accès aux données
+          if (response && Array.isArray(response)) {
+            setEnrolledFormations(response);
+          } else if (response && response.data) {
+            setEnrolledFormations(response.data);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur chargement formations:', error);
+      } finally {
+        setLoadingFormations(false);
+      }
+    };
+    
+    loadFormations();
+  }, [user?.id]);
 
   const [formationSearch, setFormationSearch] = useState('');
   const [formationFilterProf, setFormationFilterProf] = useState('');
@@ -92,8 +125,9 @@ export default function ApprenantDashboard() {
       try {
         setCertificationsLoading(true);
         const response = await apiCertif.getCertifications();
-        if (response && response.data) {
-          setCertifications(response.data);
+        // ✅ CORRECTION: le backend renvoie { data: { data: [...] } }
+        if (response && response.data && response.data.data) {
+          setCertifications(response.data.data);
         }
       } catch (error) {
         console.error('Erreur chargement certifications:', error);
@@ -107,6 +141,18 @@ export default function ApprenantDashboard() {
     
     loadCertifications();
   }, []);
+
+  // ── Variables calculées pour les statistiques dynamiques ──
+  const totalFormations = enrolledFormations.length;
+  const averageProgress = totalFormations > 0 
+    ? Math.round(enrolledFormations.reduce((sum, f) => sum + (f.progress || 0), 0) / totalFormations)
+    : 0;
+  const totalCertificates = certifications.length;
+  const totalHours = enrolledFormations.reduce((sum, f) => {
+    // Extraire le nombre d'heures de la durée (ex: "2h" -> 2, "1h 30min" -> 1.5)
+    const match = f.duration?.match(/(\d+(?:\.\d+)?)/);
+    return sum + (match ? parseFloat(match[1]) : 0);
+  }, 0);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -160,69 +206,79 @@ export default function ApprenantDashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4"><div className="p-3 bg-blue-100 rounded-full"><BookOpen className="w-6 h-6 text-blue-600" /></div></div>
-                <h3 className="text-3xl font-bold text-blue-700">5</h3>
+                <div className="flex justify-center items-center gap-4 mb-4"><div className="p-3 bg-blue-100 rounded-full"><BookOpen className="w-6 h-6 text-blue-600" /></div></div>
+                <h3 className="text-3xl font-bold text-blue-700">{totalFormations}</h3>
                 <p className="text-blue-600 font-medium">Formations inscrites</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4"><div className="p-3 bg-green-100 rounded-full"><TrendingUp className="w-6 h-6 text-green-600" /></div></div>
-                <h3 className="text-3xl font-bold text-green-700">67%</h3>
+                <div className="flex justify-center items-center gap-4 mb-4"><div className="p-3 bg-green-100 rounded-full"><TrendingUp className="w-6 h-6 text-green-600" /></div></div>
+                <h3 className="text-3xl font-bold text-green-700">{averageProgress}%</h3>
                 <p className="text-green-600 font-medium">Progression moyenne</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4"><div className="p-3 bg-purple-100 rounded-full"><Award className="w-6 h-6 text-purple-600" /></div></div>
-                <h3 className="text-3xl font-bold text-purple-700">3</h3>
+                <div className="flex justify-center items-center gap-4 mb-4"><div className="p-3 bg-purple-100 rounded-full"><Award className="w-6 h-6 text-purple-600" /></div></div>
+                <h3 className="text-3xl font-bold text-purple-700">{totalCertificates}</h3>
                 <p className="text-purple-600 font-medium">Certificats obtenus</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4"><div className="p-3 bg-orange-100 rounded-full"><Clock className="w-6 h-6 text-orange-600" /></div></div>
-                <h3 className="text-3xl font-bold text-orange-700">24h</h3>
+                <div className="flex justify-center items-center gap-4 mb-4"><div className="p-3 bg-orange-100 rounded-full"><Clock className="w-6 h-6 text-orange-600" /></div></div>
+                <h3 className="text-3xl font-bold text-orange-700">{totalHours}h</h3>
                 <p className="text-orange-600 font-medium">Heures de formation</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
-                {[
-                  { id: 1, title: 'Développement Web Complet', progress: 75, duration: '12 semaines', sessions: 24, price: 'Gratuit', color: 'from-blue-500 to-blue-700' },
-                  { id: 4, title: 'Data Science avec Python', progress: 45, duration: '10 semaines', sessions: 18, price: '35 000 CFA', color: 'from-green-500 to-green-700' }
-                ].map((course, idx) => (
-                  <div key={idx} className="bg-white rounded-xl shadow-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="text-base font-semibold text-gray-800 mb-1">{course.title}</h3>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${course.price === 'Gratuit' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                          {course.price}
-                        </span>
-                      </div>
-                      <div className={`p-2 bg-gradient-to-r ${course.color} rounded-full`}>
-                        <PlayCircle className="w-4 h-4 text-white" />
-                      </div>
-                    </div>
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-600">Progression</span>
-                        <span className="font-medium text-gray-800">{course.progress}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className={`bg-gradient-to-r ${course.color} h-2 rounded-full`} style={{ width: `${course.progress}%` }} />
-                      </div>
-                    </div>
-                    <div className="flex gap-4 text-xs text-gray-600">
-                      <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-gray-400" /><span>{course.duration}</span></div>
-                      <div className="flex items-center gap-1"><BookOpen className="w-3 h-3 text-gray-400" /><span>{course.sessions} sessions</span></div>
-                    </div>
-                    {/* ── Bouton Continuer : appelle openFormation ── */}
-                    <button
-                      onClick={() => openFormation(course.id)}
-                      className={`w-full mt-3 py-1.5 text-sm bg-gradient-to-r ${course.color} text-white rounded-lg font-medium hover:opacity-90 transition`}
-                    >
-                      Continuer
-                    </button>
+                {loadingFormations ? (
+                  <div className="bg-white rounded-xl shadow-lg p-4 text-center">
+                    <p className="text-gray-500">Chargement des formations...</p>
                   </div>
-                ))}
+                ) : enrolledFormations.length === 0 ? (
+                  <div className="bg-white rounded-xl shadow-lg p-4 text-center">
+                    <p className="text-gray-500">Vous n'êtes inscrit à aucune formation</p>
+                  </div>
+                ) : (
+                  // Afficher seulement les 2 dernières formations consultées
+                  enrolledFormations.slice(-2).map((course, idx) => {
+                    const gradient = course.typeCours === 'GRATUIT' ? 'from-blue-500 to-blue-700' : 'from-green-500 to-green-700';
+                    return (
+                    <div key={idx} className="bg-white rounded-xl shadow-lg p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="text-base font-semibold text-gray-800 mb-1">{course.title}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${course.price === 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {course.price === 0 ? 'Gratuit' : `${course.price} CFA`}
+                          </span>
+                        </div>
+                        <div className={`p-2 bg-gradient-to-r ${gradient} rounded-full`}>
+                          <PlayCircle className="w-4 h-4 text-white" />
+                        </div>
+                      </div>
+                      <div className="mb-3">
+                        <div className="flex justify-between text-xs mb-1">
+                          <span className="text-gray-600">Progression</span>
+                          <span className="font-medium text-gray-800">{course.progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className={`bg-gradient-to-r ${gradient} h-2 rounded-full`} style={{ width: `${course.progress}%` }} />
+                        </div>
+                      </div>
+                      <div className="flex gap-4 text-xs text-gray-600">
+                        <div className="flex items-center gap-1"><Clock className="w-3 h-3 text-gray-400" /><span>{course.duration}</span></div>
+                        <div className="flex items-center gap-1"><BookOpen className="w-3 h-3 text-gray-400" /><span>Professeur: {course.professor}</span></div>
+                      </div>
+                      <button
+                        onClick={() => openFormation(course.id)}
+                        className={`w-full mt-3 py-1.5 text-sm bg-gradient-to-r ${gradient} text-white rounded-lg font-medium hover:opacity-90 transition`}
+                      >
+                        Continuer
+                      </button>
+                    </div>
+                  );
+                  })
+                )}
               </div>
 
               <div className="bg-white rounded-xl shadow-lg p-6 h-fit">
@@ -260,7 +316,7 @@ export default function ApprenantDashboard() {
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Mes Formations</h2>
             <div className="flex flex-wrap gap-4 mb-6">
-              <div className="flex-1 min-w-[200px]">
+              <div className="flex-1 min-w-50">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input type="text" placeholder="Rechercher par nom..." value={formationSearch}
@@ -268,39 +324,21 @@ export default function ApprenantDashboard() {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                 </div>
               </div>
-              <div className="min-w-[150px]">
+              <div className="min-w-37.5">
                 <select value={formationFilterProf} onChange={(e) => { setFormationFilterProf(e.target.value); setFormationPage(1); }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                   <option value="">Tous les profs</option>
-                  <option value="Pr. Martin">Pr. Martin</option>
-                  <option value="Pr. Dupont">Pr. Dupont</option>
+                  {[...new Set(enrolledFormations.map(f => f.professor))].map((prof, idx) => (
+                    <option key={idx} value={prof}>{prof}</option>
+                  ))}
                 </select>
               </div>
             </div>
             {(() => {
-              const storedInscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
-              const userInscriptions = storedInscriptions.filter(
-                (inscription: { utilisateurId: number }) => user && inscription.utilisateurId === user.id
-              );
-              const allFormations = userInscriptions.map((inscription: { coursId: number; coursTitre: string; dateInscription: string }, index: number) => {
-                return { 
-                  id: inscription.coursId, 
-                  uniqueKey: `${inscription.coursId}-${index}`, // Clé unique pour React
-                  title: inscription.coursTitre, 
-                  professor: 'Professeur',
-                  duration: 'À définir',
-                  image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=600',
-                  dateInscription: inscription.dateInscription, 
-                  progress: 0 
-                };
-              });
-              // Supprimer les doublons basée sur coursId
-              const uniqueFormations = allFormations.filter((formation: EnrolledFormation & { uniqueKey: string }, index: number, self: (EnrolledFormation & { uniqueKey: string })[]) => 
-                index === self.findIndex((f: EnrolledFormation & { uniqueKey: string }) => f.id === formation.id)
-              );
-              const filteredFormations = uniqueFormations.filter((formation: EnrolledFormation) => {
+              // ✅ UTILISER LES DONNÉES DE L'API PAS LE LOCALSTORAGE !
+              const filteredFormations = enrolledFormations.filter((formation: EnrolledFormation) => {
                 const matchesSearch = formation.title.toLowerCase().includes(formationSearch.toLowerCase());
-                const matchesProf = !formationFilterProf || formation.professor === formationFilterProf;
+                const matchesProf = !formationFilterProf || formation.professor.toLowerCase().includes(formationFilterProf.toLowerCase());
                 return matchesSearch && matchesProf;
               });
               const totalPages = Math.ceil(filteredFormations.length / formationsPerPage);
@@ -346,16 +384,18 @@ export default function ApprenantDashboard() {
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
               <span className="w-2 h-8 bg-green-500 rounded-full"></span>Ma Progression
             </h2>
+            {loadingFormations ? (
+              <p className="text-gray-500">Chargement...</p>
+            ) : enrolledFormations.length === 0 ? (
+              <p className="text-gray-500">Aucune formation en cours</p>
+            ) : (
             <div className="space-y-6">
-              {[
-                { title: 'Introduction a React', progress: 75, color: 'from-blue-500 to-blue-700', icon: '⚛️' },
-                { title: 'JavaScript Avance', progress: 50, color: 'from-yellow-500 to-orange-500', icon: '📜' },
-                { title: 'Node.js Backend', progress: 25, color: 'from-green-500 to-green-700', icon: '🖥️' },
-              ].map((course, idx) => (
+              {enrolledFormations.map((course, idx) => {
+                const color = course.progress >= 75 ? 'from-green-500 to-green-700' : course.progress >= 50 ? 'from-yellow-500 to-orange-500' : 'from-red-500 to-red-700';
+                return (
                 <div key={idx} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl">{course.icon}</span>
                       <span className="font-semibold text-gray-800">{course.title}</span>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-sm font-bold ${course.progress >= 75 ? 'bg-green-100 text-green-700' : course.progress >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
@@ -363,14 +403,15 @@ export default function ApprenantDashboard() {
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div className={`bg-gradient-to-r ${course.color} h-3 rounded-full transition-all duration-500`} style={{ width: `${course.progress}%` }}></div>
+                    <div className={`bg-gradient-to-r ${color} h-3 rounded-full transition-all duration-500`} style={{ width: `${course.progress}%` }}></div>
                   </div>
                   <div className="flex justify-between mt-2 text-xs text-gray-500">
                     <span>0%</span><span>50%</span><span>100%</span>
                   </div>
                 </div>
-              ))}
+                )})}
             </div>
+            )}
           </div>
         );
 
@@ -399,17 +440,17 @@ export default function ApprenantDashboard() {
                 );
               }
               
-              const filteredCerts = certifications.filter((cert) => cert.formation?.titre && cert.formation?.titre.toLowerCase().includes(certificatSearch.toLowerCase()));
+               const filteredCerts = Array.isArray(certifications) ? certifications.filter((cert) => cert.formation?.titre && cert.formation?.titre.toLowerCase().includes(certificatSearch.toLowerCase())) : [];
               const totalPages = Math.ceil(filteredCerts.length / certificatsPerPage);
               const paginatedCerts = filteredCerts.slice((certificatPage - 1) * certificatsPerPage, certificatPage * certificatsPerPage);
               return (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {paginatedCerts.map((cert: CertificateData) => (
-                      <div key={cert.id} className="relative overflow-hidden bg-gradient-to-br from-yellow-50 to-amber-100 rounded-xl p-5 border border-yellow-200 hover:shadow-lg transition-shadow">
+                      <div key={cert.id} className="relative overflow-hidden bg-linear-to-br from-yellow-50 to-amber-100 rounded-xl p-5 border border-yellow-200 hover:shadow-lg transition-shadow">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-200 rounded-full -mr-8 -mt-8 opacity-50"></div>
                         <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-md">
+                          <div className="w-14 h-14 bg-linear-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-md">
                             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
                           </div>
                           <div className="flex-1">

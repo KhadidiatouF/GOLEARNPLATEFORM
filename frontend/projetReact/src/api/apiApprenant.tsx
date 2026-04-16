@@ -8,6 +8,19 @@ const getAuthHeaders = () => {
   };
 };
 
+// Interface pour les formations avec progression de l'apprenant
+interface EnrolledFormation {
+  id: number;
+  title: string;
+  professor: string;
+  duration: string;
+  image: string | null;
+  dateInscription: string;
+  progress: number;
+  price: number;
+  typeCours: string;
+}
+
 export const apiApprenant = {
   getApprenants: async () => {
     try {
@@ -33,6 +46,21 @@ export const apiApprenant = {
       return await response.json();
     } catch (error) {
       console.error('Erreur lors du fetch de l\'apprenant:', error);
+      throw error;
+    }
+  },
+
+  // Récupérer les formations auxquelles l'apprenant est inscrit avec sa progression
+  getFormationsWithProgress: async (userId: number): Promise<{ success: boolean; data: EnrolledFormation[] }> => {
+    try {
+      const response = await fetch(`${BASE_URL}/apprenants/by-user/${userId}/formations`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error("Erreur lors du fetch des formations");
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur lors du fetch des formations:', error);
       throw error;
     }
   },

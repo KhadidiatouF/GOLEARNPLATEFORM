@@ -79,5 +79,20 @@ export const apiAdministrateur = {
       console.error('Erreur lors de la suppression de l\'administrateur:', error);
       throw error;
     }
+  },
+
+  getStatistics: async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/admin/statistics`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error("Erreur lors du fetch des statistiques");
+      const result = await response.json();
+      return result.data || result;
+    } catch (error) {
+      console.error('Erreur lors du fetch des statistiques:', error);
+      throw error;
+    }
   }
 };

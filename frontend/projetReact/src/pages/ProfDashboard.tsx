@@ -4,6 +4,8 @@ import DashboardHeader from '../components/DashboardHeader';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { apiFormation } from '../api/apiFormation';
+import { apiProgression } from '../api/apiProgression';
+import { apiUsers } from '../api/apiUsers';
 import { BookOpen, Users, Calendar, Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Types pour la création complète de formation
@@ -16,11 +18,44 @@ interface Chapitre {
   typeContenu: 'VIDEO' | 'PDF' | 'TEXTE';
 }
 
+interface Reponse {
+  contenu: string;
+  estCorrecte: boolean;
+}
+
+interface Question {
+  contenu: string;
+  reponses: Reponse[];
+}
+
+interface Quiz {
+  questions: Question[];
+}
+
 interface Session {
   titre: string;
   contenu?: string;
   duree?: string;
   chapitres: Chapitre[];
+  quiz?: Quiz;
+}
+
+interface ApprenantData {
+  apprenant?: {
+    id: number;
+    name: string;
+    email?: string;
+  };
+  formation?: {
+    id: number;
+    titre: string;
+  } | string;
+  progression?: {
+    percentage: number;
+  };
+  name?: string;
+  progress?: number;
+  status?: string;
 }
 
 interface Course {
@@ -34,12 +69,30 @@ interface Course {
   typeCours: 'PAYANT' | 'GRATUIT';
   students: number;
   modules: number;
-  status: 'pending' | 'validated' | 'rejected';
+  status: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
   color: string;
   professeurId: number;
 }
 
-type TabType = 'dashboard' | 'formations' | 'apprenants' | 'travaux' | 'parametres';
+// Interface pour les données de formation reçues de l'API
+interface FormationFromAPI {
+  id: number;
+  titre: string;
+  description: string;
+  prix: number;
+  categorie: string;
+  niveau: string;
+  image?: string | null;
+  typeCours: 'PAYANT' | 'GRATUIT';
+  status?: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
+  // Le champ "statut" peut aussi être envoyé par l'API
+  statut?: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
+  professeurId: number;
+  sessions?: { id: number }[];
+  apprenants?: { id: number }[];
+}
+
+type TabType = 'dashboard' | 'formations' | 'apprenants' | 'solde' | 'parametres';
 
 interface MenuItem {
   id: TabType;
@@ -76,11 +129,11 @@ const menuItems: MenuItem[] = [
     )
   },
   {
-    id: 'travaux',
-    label: 'Travaux à corriger',
+    id: 'solde',
+    label: 'Solde',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     )
   },
@@ -101,15 +154,11 @@ export default function ProfDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [courses, setCourses] = useState<Course[]>([
-    { id: 1, titre: 'Introduction à React', description: 'Apprenez les bases de React', prix: 25000, categorie: 'Développement Web', niveau: 'Débutant', typeCours: 'PAYANT', students: 45, modules: 12, status: 'validated', color: 'from-blue-500 to-blue-700', professeurId: 1 },
-    { id: 2, titre: 'JavaScript Avancé', description: 'Maîtrisez JavaScript', prix: 0, categorie: 'Développement Web', niveau: 'Avancé', typeCours: 'GRATUIT', students: 32, modules: 8, status: 'validated', color: 'from-green-500 to-green-700', professeurId: 1 },
-    { id: 3, titre: 'TypeScript Fundamentals', description: 'Introduction à TypeScript', prix: 30000, categorie: 'Développement Web', niveau: 'Intermédiaire', typeCours: 'PAYANT', students: 28, modules: 10, status: 'pending', color: 'from-purple-500 to-purple-700', professeurId: 1 },
-    { id: 4, titre: 'Node.js Backend', description: 'Créez des API avec Node.js', prix: 0, categorie: 'Développement Web', niveau: 'Intermédiaire', typeCours: 'GRATUIT', students: 20, modules: 15, status: 'pending', color: 'from-orange-500 to-orange-700', professeurId: 1 },
-  ]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<number | null>(null);
+  const [solde, setSolde] = useState<number>(0);
   const [newCourse, setNewCourse] = useState({
     titre: '',
     description: '',
@@ -118,7 +167,7 @@ export default function ProfDashboard() {
     niveau: '',
     typeCours: 'GRATUIT' as 'PAYANT' | 'GRATUIT',
     image: '',
-    sessions: [{ titre: '', chapitres: [] }] as Session[]
+    sessions: [{ titre: '', chapitres: [], quiz: undefined } as Session]
   });
   
   // Gestion des erreurs du formulaire
@@ -136,6 +185,12 @@ export default function ProfDashboard() {
   const [apprenantFilterCourse, setApprenantFilterCourse] = useState('');
   const [apprenantPage, setApprenantPage] = useState(1);
   const apprenantsPerPage = 10;
+
+  // État pour les apprenants inscrits (dynamique)
+  const [enrolledApprenants, setEnrolledApprenants] = useState<ApprenantData[]>([]);
+  const [apprenantsLoading, setApprenantsLoading] = useState(true);
+
+
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -203,17 +258,28 @@ export default function ProfDashboard() {
       const formationData = {
         titre: newCourse.titre.trim(),
         description: newCourse.description.trim(),
-        prix: newCourse.typeCours === 'GRATUIT' ? 0 : Number(newCourse.prix),
+        prix: newCourse.typeCours === 'GRATUIT' ? 0 : (Number(newCourse.prix) || 0),
         categorie: newCourse.categorie,
         niveau: newCourse.niveau,
         typeCours: newCourse.typeCours,
         image: newCourse.image?.trim() || undefined,
-        professeurId: professeurId,
+        professeurId: Number(professeurId),
         sessions: newCourse.sessions.filter(s => s.titre.trim()).map(session => ({
           titre: session.titre,
           contenu: session.contenu || '',
           duree: session.duree || '',
-          chapitres: session.chapitres.filter(c => c.titre.trim())
+          chapitres: session.chapitres.filter(c => c.titre.trim()).map(c => ({
+            titre: c.titre,
+            contenu: c.contenu,
+            duree: c.duree,
+            typeContenu: c.typeContenu || 'VIDEO'
+          })),
+          quiz: session.quiz && session.quiz.questions.length > 0 ? {
+            questions: session.quiz.questions.filter(q => q.contenu.trim()).map(q => ({
+              contenu: q.contenu,
+              reponses: q.reponses.filter(r => r.contenu.trim())
+            }))
+          } : undefined
         }))
       };
 
@@ -233,7 +299,7 @@ export default function ProfDashboard() {
           image: newCourse.image,
           students: 0,
           modules: 0,
-          status: 'pending',
+          status: 'EN_ATTENTE',
           color: 'from-indigo-500 to-indigo-700',
           professeurId: professeurId
         };
@@ -247,7 +313,7 @@ export default function ProfDashboard() {
           niveau: '',
           typeCours: 'GRATUIT',
           image: '',
-          sessions: [{ titre: '', chapitres: [] }]
+          sessions: [{ titre: '', chapitres: [], quiz: undefined }]
         });
         setSubmitStatus({ type: 'success', message: 'Formation créée avec succès! En attente de validation.' });
       }
@@ -278,6 +344,119 @@ export default function ProfDashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  // Charger les apprenants inscrits pour le professeur
+  useEffect(() => {
+    const fetchEnrolledApprenants = async () => {
+      try {
+        setApprenantsLoading(true);
+        const response = await apiProgression.getProgressionByProfesseur();
+        if (response && response.data) {
+          console.log('Apprenants chargés:', response.data);
+          setEnrolledApprenants(response.data);
+          
+          // On ne met plus à jour les courses depuis les apprenants (déjà chargé par l'effet formations)
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des apprenants:', error);
+      } finally {
+        setApprenantsLoading(false);
+      }
+    };
+
+    fetchEnrolledApprenants();
+  }, []);
+
+  // Charger les formations du professeur connecté
+  useEffect(() => {
+    const fetchProfessorFormations = async () => {
+      try {
+        console.log('Chargement des formations pour le professeur...');
+        const response = await apiFormation.getFormations();
+        
+        if (response && response.data) {
+          console.log('Formations reçues:', response.data);
+          // Debug: vérifier le statut de chaque formation
+          response.data.forEach((formation: { titre: string; status?: string }) => {
+            console.log(`Formation "${formation.titre}" - status: "${formation.status}"`);
+          });
+          // Transformer les données de l'API vers le format Course
+          const formattedCourses: Course[] = response.data.map((formation: FormationFromAPI) => ({
+            id: formation.id,
+            titre: formation.titre,
+            description: formation.description,
+            prix: formation.prix,
+            categorie: formation.categorie,
+            niveau: formation.niveau,
+            image: formation.image || undefined,
+            typeCours: formation.typeCours,
+            students: formation.apprenants?.length || 0,
+            modules: formation.sessions?.length || 0,
+            status: formation.statut || 'EN_ATTENTE',
+            color: 'from-indigo-500 to-indigo-700',
+            professeurId: formation.professeurId
+          }));
+          console.log('Formations formatées:', formattedCourses);
+          setCourses(formattedCourses);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des formations:', error);
+      }
+    };
+
+    // Charger au montage et quand user?.id change
+    fetchProfessorFormations();
+  }, [user?.id]);
+  
+  // Charger les apprenants pour le dashboard (indépendamment de l'onglet actif)
+  useEffect(() => {
+    const fetchEnrolledApprenants = async () => {
+      try {
+        setApprenantsLoading(true);
+        const response = await apiProgression.getProgressionByProfesseur();
+        if (response && response.data) {
+          console.log('Apprenants reçus:', response.data);
+          setEnrolledApprenants(response.data);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des apprenants:', error);
+      } finally {
+        setApprenantsLoading(false);
+      }
+    };
+
+    fetchEnrolledApprenants();
+  }, []);
+
+  // Charger le profil pour récupérer le solde
+  useEffect(() => {
+    const fetchSolde = async () => {
+      try {
+        const response = await apiUsers.getMonProfil();
+        if (response && response.data) {
+          console.log('Profil chargé - solde:', response.data.solde);
+          setSolde(response.data.solde || 0);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement du profil:', error);
+      }
+    };
+
+    fetchSolde();
+  }, []);
+
+
+  // ── Variables calculées pour les statistiques dynamiques du professeur ──
+  // Formation active = toute formation qui appartient au professeur (peu importe le statut)
+  const activeFormationsCount = courses.length;
+  // Le nombre d'apprenants inscrits = soit depuis les apprenants chargés, soit depuis les formations
+  const totalStudentsCount = enrolledApprenants.length > 0 
+    ? enrolledApprenants.length 
+    : courses.reduce((sum, c) => sum + c.students, 0);
+  // Travaux en attente = formations avec statut 'EN_ATTENTE' ou 'REJETEE'
+  const pendingWorksCount = courses.filter(c => c.status === 'EN_ATTENTE' || c.status === 'REJETEE').length;
+  // Formations validées = formations avec statut 'VALIDEE' (statut différent de 'EN_ATTENTE' et 'REJETEE')
+  const validatedFormationsCount = courses.filter(c => c.status !== 'EN_ATTENTE' && c.status !== 'REJETEE').length;
+
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
   };
@@ -292,21 +471,21 @@ export default function ProfDashboard() {
         return (
           <div className="space-y-6">
             {/* Carte de bienvenue avec image */}
-            <div className="w-full rounded-xl shadow-lg bg-linear-to-r from-green-600 to-green-700 p-6 md:p-8">
+            <div className="w-full rounded-xl shadow-lg bg-purple-600  p-6 md:p-8">
               <div className="flex flex-col md:flex-row items-center justify-between">
                 {/* Texte à gauche */}
                 <div className="text-white mb-4 md:mb-0">
                   <h2 className="text-2xl md:text-3xl font-bold mb-2">
                     Bienvenue, {user?.name || 'Professeur'} !
                   </h2>
-                  <p className="text-green-100 text-sm md:text-base">
+                  <p className="text-purple-100 text-sm md:text-base">
                     Gérez vos formations et apprenants
                   </p>
                 </div>
                 {/* Image à droite */}
                 <div className="hidden md:block">
                   <img 
-                    src="/prof.png" 
+                    src="/prof1.png" 
                     alt="Professeur" 
                     className="rounded-lg shadow-md w-80 h-35  object-cover"
                   />
@@ -315,41 +494,41 @@ export default function ProfDashboard() {
             </div>
 
             {/* Les 4 cartes de statistiques */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-green-100 rounded-full">
                     <BookOpen className="w-6 h-6 text-green-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-green-700">12</h3>
+                <h3 className="text-3xl font-bold text-green-700">{activeFormationsCount}</h3>
                 <p className="text-green-600 font-medium">Formations actives</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-blue-100 rounded-full">
                     <Users className="w-6 h-6 text-blue-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-blue-700">89</h3>
+                <h3 className="text-3xl font-bold text-blue-700">{totalStudentsCount}</h3>
                 <p className="text-blue-600 font-medium">Apprenants inscrits</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-orange-100 rounded-full">
                     <Clock className="w-6 h-6 text-orange-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-orange-700">23</h3>
+                <h3 className="text-3xl font-bold text-orange-700">{pendingWorksCount}</h3>
                 <p className="text-orange-600 font-medium">Travaux en attente</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center gap-4 mb-4">
+                <div className="flex justify-center items-center gap-4 mb-4">
                   <div className="p-3 bg-purple-100 rounded-full">
                     <CheckCircle className="w-6 h-6 text-purple-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-purple-700">156</h3>
+                <h3 className="text-3xl font-bold text-purple-700">{validatedFormationsCount}</h3>
                 <p className="text-purple-600 font-medium">Formations validées</p>
               </div>
             </div>
@@ -378,7 +557,7 @@ export default function ProfDashboard() {
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
-                            className="bg-linear-to-r from-green-500 to-green-600 h-2 rounded-full" 
+                            className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full" 
                             style={{ width: `${student.progress}%` }}
                           />
                         </div>
@@ -461,12 +640,12 @@ export default function ProfDashboard() {
             <div className="bg-white rounded-xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold flex items-center gap-2">
-                  <span className="w-2 h-8 bg-green-600 rounded-full"></span>
+                  <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
                   Mes Formations
                 </h2>
                 <button
                   onClick={() => setIsModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <Plus className="w-5 h-5" />
                   Ajouter une formation
@@ -475,7 +654,7 @@ export default function ProfDashboard() {
               
               {/* Filtres de recherche */}
               <div className="flex flex-wrap gap-4 mb-6">
-                <div className="flex-1 min-w-[200px]">
+                <div className="flex-1 min-w-50">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
@@ -483,7 +662,7 @@ export default function ProfDashboard() {
                       placeholder="Rechercher par nom..."
                       value={formationSearch}
                       onChange={(e) => { setFormationSearch(e.target.value); setFormationPage(1); }}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     />
                   </div>
                 </div>
@@ -491,23 +670,28 @@ export default function ProfDashboard() {
                   <select
                     value={formationFilterStatus}
                     onChange={(e) => { setFormationFilterStatus(e.target.value); setFormationPage(1); }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
                   >
                     <option value="">Tous les statuts</option>
-                    <option value="validated">Validée</option>
-                    <option value="pending">En attente</option>
-                    <option value="rejected">Rejetée</option>
+                    {[...new Set(courses.map(c => c.status as string | null | undefined))].filter(s => s).map((statut, idx) => (
+                      <option key={idx} value={String(statut).toLowerCase()}>
+                        {String(statut).toUpperCase() === 'VALIDEE' ? 'Validée' 
+                        : String(statut).toUpperCase() === 'EN_ATTENTE' ? 'En attente' 
+                        : String(statut).toUpperCase() === 'REJETEE' ? 'Rejetée' 
+                        : String(statut)}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               {/* Formations filtrées */}
               {(() => {
-                const filteredCourses = courses.filter(course => {
-                  const matchesSearch = course.titre.toLowerCase().includes(formationSearch.toLowerCase());
-                  const matchesStatus = !formationFilterStatus || course.status === formationFilterStatus;
-                  return matchesSearch && matchesStatus;
-                });
+                 const filteredCourses = courses.filter(course => {
+                   const matchesSearch = course.titre.toLowerCase().includes(formationSearch.toLowerCase());
+                   const matchesStatus = !formationFilterStatus || String(course.status).toLowerCase() === formationFilterStatus;
+                   return matchesSearch && matchesStatus;
+                 });
                 const totalPages = Math.ceil(filteredCourses.length / formationsPerPage);
                 const paginatedCourses = filteredCourses.slice(
                   (formationPage - 1) * formationsPerPage,
@@ -518,18 +702,18 @@ export default function ProfDashboard() {
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {paginatedCourses.map((course) => (
-                        <div key={course.id} className={`relative overflow-hidden rounded-xl p-5 bg-linear-to-r ${course.color} text-white shadow-md hover:shadow-lg transition-shadow`}>
+                        <div key={course.id} className={`relative overflow-hidden rounded-xl p-5 bg-gradient-to-r ${course.color} text-white shadow-md hover:shadow-lg transition-shadow`}>
                           <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
                           
                           {/* Status badge et boutons */}
                           <div className="flex justify-between items-start mb-3">
                             <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                              course.status === 'validated' ? 'bg-green-400 text-green-900' :
-                              course.status === 'pending' ? 'bg-yellow-400 text-yellow-900' :
+                              course.status === 'VALIDEE' ? 'bg-green-400 text-green-900' :
+                              course.status === 'EN_ATTENTE' ? 'bg-yellow-400 text-yellow-900' :
                               'bg-red-400 text-red-900'
                             }`}>
-                              {course.status === 'validated' ? <><CheckCircle className="w-3 h-3" /> Validée</> :
-                               course.status === 'pending' ? <><Clock className="w-3 h-3" /> En attente</> :
+                              {course.status === 'VALIDEE' ? <><CheckCircle className="w-3 h-3" /> Validée</> :
+                               course.status === 'EN_ATTENTE' ? <><Clock className="w-3 h-3" /> En attente</> :
                                <><XCircle className="w-3 h-3" /> Rejetée</>}
                             </span>
                             <div className="flex gap-2">
@@ -678,7 +862,7 @@ export default function ProfDashboard() {
                         setNewCourse({ ...newCourse, niveau: e.target.value });
                         if (formErrors.niveau) setFormErrors({ ...formErrors, niveau: '' });
                       }}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent ${formErrors.niveau ? 'border-red-500' : 'border-gray-300'}`}
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${formErrors.niveau ? 'border-red-500' : 'border-gray-300'}`}
                     >
                       <option value="">Sélectionner un niveau</option>
                       <option value="Débutant">Débutant</option>
@@ -693,7 +877,7 @@ export default function ProfDashboard() {
                     <select
                       value={newCourse.typeCours}
                       onChange={(e) => setNewCourse({ ...newCourse, typeCours: e.target.value as 'PAYANT' | 'GRATUIT' })}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="GRATUIT">Gratuit</option>
                       <option value="PAYANT">Payant</option>
@@ -706,7 +890,7 @@ export default function ProfDashboard() {
                     type="url"
                     value={newCourse.image}
                     onChange={(e) => setNewCourse({ ...newCourse, image: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="https://exemple.com/image.jpg"
                   />
                 </div>
@@ -717,8 +901,8 @@ export default function ProfDashboard() {
                     <label className="block text-sm font-medium text-gray-700">Sessions / Modules *</label>
                     <button
                       type="button"
-                      onClick={() => setNewCourse({ ...newCourse, sessions: [...newCourse.sessions, { titre: '', chapitres: [] }] })}
-                      className="text-sm text-green-600 hover:text-green-700 flex items-center gap-1"
+                      onClick={() => setNewCourse({ ...newCourse, sessions: [...newCourse.sessions, { titre: '', chapitres: [], quiz: undefined }] })}
+                      className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1"
                     >
                       <Plus className="w-4 h-4" /> Ajouter une session
                     </button>
@@ -751,7 +935,7 @@ export default function ProfDashboard() {
                           updatedSessions[sessionIndex].titre = e.target.value;
                           setNewCourse({ ...newCourse, sessions: updatedSessions });
                         }}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 mb-3 ${formErrors[`session_${sessionIndex}`] ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 mb-3 ${formErrors[`session_${sessionIndex}`] ? 'border-red-500' : 'border-gray-300'}`}
                         placeholder="Titre de la session (ex: Introduction, Bases...)"
                       />
                       {formErrors[`session_${sessionIndex}`] && <p className="text-red-500 text-sm mb-2">{formErrors[`session_${sessionIndex}`]}</p>}
@@ -839,6 +1023,126 @@ export default function ProfDashboard() {
                             </select>
                           </div>
                         ))}
+
+                        {/* Section Quiz pour la session */}
+                        <div className="mt-4 border-t pt-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs text-gray-600 font-medium">Quiz de la session</span>
+                            {!session.quiz || !session.quiz.questions || session.quiz.questions.length === 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedSessions = [...newCourse.sessions];
+                                  updatedSessions[sessionIndex].quiz = { questions: [{ contenu: '', reponses: [{ contenu: '', estCorrecte: false }] }] };
+                                  setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                }}
+                                className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" /> Ajouter un quiz
+                              </button>
+                            ) : null}
+                          </div>
+
+                          {session.quiz && session.quiz.questions && session.quiz.questions.length > 0 && (
+                            <div className="bg-green-50 rounded border border-green-200 p-3">
+                              {session.quiz.questions.map((question, questionIndex) => (
+                                <div key={questionIndex} className="bg-white rounded border p-2 mb-2">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-medium text-gray-600">Question {questionIndex + 1}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updatedSessions = [...newCourse.sessions];
+                                        updatedSessions[sessionIndex].quiz?.questions.splice(questionIndex, 1);
+                                        if (updatedSessions[sessionIndex].quiz?.questions.length === 0) {
+                                          updatedSessions[sessionIndex].quiz = undefined;
+                                        }
+                                        setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                      }}
+                                      className="text-red-400 hover:text-red-600"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={question.contenu}
+                                    onChange={(e) => {
+                                      const updatedSessions = [...newCourse.sessions];
+                                      updatedSessions[sessionIndex].quiz!.questions[questionIndex].contenu = e.target.value;
+                                      setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                    }}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                                    placeholder="Contenu de la question"
+                                  />
+                                  
+                                  {/* Réponses */}
+                                  <div className="ml-2">
+                                    <span className="text-xs text-gray-500">Réponses (cochez la bonne réponse):</span>
+                                    {question.reponses.map((reponse, reponseIndex) => (
+                                      <div key={reponseIndex} className="flex items-center gap-2 mt-1">
+                                        <input
+                                          type="checkbox"
+                                          checked={reponse.estCorrecte}
+                                          onChange={(e) => {
+                                            const updatedSessions = [...newCourse.sessions];
+                                            updatedSessions[sessionIndex].quiz!.questions[questionIndex].reponses[reponseIndex].estCorrecte = e.target.checked;
+                                            setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                          }}
+                                          className="w-4 h-4"
+                                        />
+                                        <input
+                                          type="text"
+                                          value={reponse.contenu}
+                                          onChange={(e) => {
+                                            const updatedSessions = [...newCourse.sessions];
+                                            updatedSessions[sessionIndex].quiz!.questions[questionIndex].reponses[reponseIndex].contenu = e.target.value;
+                                            setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                          }}
+                                          className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+                                          placeholder="Réponse"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const updatedSessions = [...newCourse.sessions];
+                                            updatedSessions[sessionIndex].quiz!.questions[questionIndex].reponses.splice(reponseIndex, 1);
+                                            setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                          }}
+                                          className="text-red-400 hover:text-red-600"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updatedSessions = [...newCourse.sessions];
+                                        updatedSessions[sessionIndex].quiz!.questions[questionIndex].reponses.push({ contenu: '', estCorrecte: false });
+                                        setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                      }}
+                                      className="text-xs text-blue-600 hover:text-blue-700 mt-1 flex items-center gap-1"
+                                    >
+                                      <Plus className="w-3 h-3" /> Ajouter une réponse
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedSessions = [...newCourse.sessions];
+                                  updatedSessions[sessionIndex].quiz!.questions.push({ contenu: '', reponses: [{ contenu: '', estCorrecte: false }] });
+                                  setNewCourse({ ...newCourse, sessions: updatedSessions });
+                                }}
+                                className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" /> Ajouter une question
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -850,7 +1154,7 @@ export default function ProfDashboard() {
                   </p>
                 </div>
                 {submitStatus.message && (
-                  <div className={`p-4 rounded-lg ${submitStatus.type === 'success' ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                  <div className={`p-4 rounded-lg ${submitStatus.type === 'success' ? 'bg-purple-50 border border-green-200 text-purple-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
                     <p className="text-sm">{submitStatus.message}</p>
                   </div>
                 )}
@@ -868,7 +1172,7 @@ export default function ProfDashboard() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                    className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
                   >
                     Soumettre pour validation
                   </button>
@@ -889,7 +1193,22 @@ export default function ProfDashboard() {
             />
           </div>
         );
-      case 'apprenants':
+      case 'apprenants': {
+        // Computed filtered data before return
+        const allApprenantsData = enrolledApprenants;
+        const filteredApprenantsData = allApprenantsData.filter((apprenant) => {
+          const name = apprenant.apprenant?.name || apprenant.name || '';
+          const formation = typeof apprenant.formation === 'object' ? apprenant.formation?.titre : apprenant.formation;
+          const formationStr = formation || '';
+          return name.toLowerCase().includes(apprenantSearch.toLowerCase()) && 
+            (!apprenantFilterCourse || formationStr === apprenantFilterCourse);
+        });
+        const totalApprenantPages = Math.ceil(filteredApprenantsData.length / apprenantsPerPage);
+        const paginatedApprenantsData = filteredApprenantsData.slice(
+          (apprenantPage - 1) * apprenantsPerPage,
+          apprenantPage * apprenantsPerPage
+        );
+        
         return (
           <div className="bg-white rounded-xl shadow-lg p-6">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
@@ -918,158 +1237,119 @@ export default function ProfDashboard() {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Toutes les formations</option>
-                  <option value="React Avancé">React Avancé</option>
-                  <option value="JavaScript ES6+">JavaScript ES6+</option>
-                  <option value="TypeScript">TypeScript</option>
+                  {courses.map((course) => (
+                    <option key={course.id} value={course.titre}>{course.titre}</option>
+                  ))}
                 </select>
               </div>
             </div>
 
             {/* Apprenants filtrés */}
-            {(() => {
-              const allApprenants = [
-                { name: 'Jean Martin', formation: 'React Avancé', progress: 75, status: 'actif' },
-                { name: 'Marie Dupont', formation: 'JavaScript ES6+', progress: 50, status: 'actif' },
-                { name: 'Sophie Leroy', formation: 'TypeScript', progress: 85, status: 'actif' },
-                { name: 'Pierre Durant', formation: 'React Avancé', progress: 30, status: 'en pause' },
-              ];
-              const filteredApprenants = allApprenants.filter(apprenant => {
-                const matchesSearch = apprenant.name.toLowerCase().includes(apprenantSearch.toLowerCase());
-                const matchesCourse = !apprenantFilterCourse || apprenant.formation === apprenantFilterCourse;
-                return matchesSearch && matchesCourse;
-              });
-              const totalPages = Math.ceil(filteredApprenants.length / apprenantsPerPage);
-              const paginatedApprenants = filteredApprenants.slice(
-                (apprenantPage - 1) * apprenantsPerPage,
-                apprenantPage * apprenantsPerPage
-              );
-              
-              return (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-linear-to-r from-blue-50 to-indigo-50">
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nom</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Formation</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Progression</th>
-                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Statut</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paginatedApprenants.map((student, idx) => (
-                          <tr key={idx} className="border-b hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-linear-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
-                                  {student.name.charAt(0)}
-                                </div>
-                                <span className="font-medium text-gray-800">{student.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">{student.formation}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-24 bg-gray-200 rounded-full h-2">
-                                  <div 
-                                    className={`h-2 rounded-full ${student.progress >= 75 ? 'bg-green-500' : student.progress >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} 
-                                    style={{ width: `${student.progress}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm font-medium">{student.progress}%</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                student.status === 'actif' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {student.status === 'actif' ? '✅ Actif' : '⏸️ En pause'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            {apprenantsLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                <span className="ml-3 text-gray-600">Chargement des apprenants...</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nom</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Formation</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Progression</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedApprenantsData.map((student: ApprenantData, idx: number) => (
+                      <tr key={idx} className="border-b hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-linear-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center text-white font-bold">
+                              {(student.apprenant?.name ?? student.name ?? '').charAt(0)}
+                            </div>
+                            <span className="font-medium text-gray-800">{student.apprenant?.name ?? student.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {typeof student.formation === 'object' ? student.formation?.titre : student.formation}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-24 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full ${(student.progression?.percentage ?? student.progress ?? 0) >= 75 ? 'bg-green-500' : (student.progression?.percentage ?? student.progress ?? 0) >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} 
+                                style={{ width: `${student.progression?.percentage ?? student.progress ?? 0}%` }}
+                              ></div>
+                            </div>
+                            <span className="text-sm font-medium">{student.progression?.percentage ?? student.progress ?? 0}%</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            (student.progression?.percentage ?? student.progress ?? 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {(student.progression?.percentage ?? student.progress ?? 0) > 0 ? '✅ Actif' : '⏸️ En attente'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                
+                {/* Pagination */}
+                {totalApprenantPages > 1 && (
+                  <div className="flex justify-center items-center gap-2 mt-6">
+                    <button
+                      onClick={() => setApprenantPage(p => Math.max(1, p - 1))}
+                      disabled={apprenantPage === 1}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm text-gray-600">
+                      Page {apprenantPage} sur {totalApprenantPages}
+                    </span>
+                    <button
+                      onClick={() => setApprenantPage(p => Math.min(totalApprenantPages, p + 1))}
+                      disabled={apprenantPage === totalApprenantPages}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
                   </div>
-                  
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex justify-center items-center gap-2 mt-6">
-                      <button
-                        onClick={() => setApprenantPage(p => Math.max(1, p - 1))}
-                        disabled={apprenantPage === 1}
-                        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-                      <span className="text-sm text-gray-600">
-                        Page {apprenantPage} sur {totalPages}
-                      </span>
-                      <button
-                        onClick={() => setApprenantPage(p => Math.min(totalPages, p + 1))}
-                        disabled={apprenantPage === totalPages}
-                        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                  )}
-                  
-                  {filteredApprenants.length === 0 && (
-                    <p className="text-center text-gray-500 py-8">Aucun apprenant trouvé</p>
-                  )}
-                </>
-              );
-            })()}
+                )}
+                
+                {filteredApprenantsData.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Aucun apprenant trouvé</p>
+                )}
+              </div>
+            )}
           </div>
         );
-      case 'travaux':
+      }
+      case 'solde':
         return (
           <div className="bg-white rounded-xl shadow-lg p-6">
             <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-              <span className="w-2 h-8 bg-orange-600 rounded-full"></span>
-              Travaux à corriger
+              <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
+              Mon Solde
             </h2>
-            <div className="space-y-4">
-              {[
-                { title: 'Projet React - Application Dashboard', student: 'Jean Martin', date: 'il y a 2 jours', type: 'projet', priority: 'haute' },
-                { title: 'TP JavaScript - Manipulation du DOM', student: 'Marie Dupont', date: 'il y a 1 jour', type: 'tp', priority: 'moyenne' },
-                { title: 'Examen TypeScript - Types avancés', student: 'Sophie Leroy', date: 'il y a 3 jours', type: 'examen', priority: 'basse' },
-              ].map((work, idx) => (
-                <div key={idx} className="relative overflow-hidden bg-linear-to-r from-gray-50 to-gray-100 rounded-xl p-5 border border-gray-200 hover:shadow-md transition-shadow">
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b from-orange-400 to-orange-600"></div>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          work.type === 'projet' ? 'bg-purple-100 text-purple-700' :
-                          work.type === 'tp' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {work.type === 'projet' ? '📁 Projet' : work.type === 'tp' ? '📝 TP' : '📋 Examen'}
-                        </span>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          work.priority === 'haute' ? 'bg-red-100 text-red-700' :
-                          work.priority === 'moyenne' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
-                        }`}>
-                          {work.priority === 'haute' ? '🔴 Haute' : work.priority === 'moyenne' ? '🟡 Moyenne' : '🟢 Basse'}
-                        </span>
-                      </div>
-                      <h3 className="font-bold text-gray-800 mb-1">{work.title}</h3>
-                      <p className="text-sm text-gray-500 flex items-center gap-1">
-                        <span>👤 {work.student}</span>
-                        <span className="mx-2">•</span>
-                        <span>📅 {work.date}</span>
-                      </p>
-                    </div>
-                    <button className="ml-4 bg-linear-to-r from-green-500 to-green-600 text-white px-5 py-2.5 rounded-lg font-medium hover:from-green-600 hover:to-green-700 transition-all shadow-md flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Corriger
-                    </button>
-                  </div>
+            <div className="space-y-6">
+              {/* Solde actuel */}
+              <div className="p-6 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl text-white">
+                <p className="text-sm opacity-90 mb-1">Solde disponible</p>
+                <p className="text-4xl font-bold">{solde.toLocaleString()} XOF</p>
+              </div>
+              {/* Historique des revenus */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mb-4">Historique des revenus</h3>
+                <div className="space-y-3">
+                <p className="text-center text-gray-500 py-6">Historique des revenus bientôt disponible</p>
+                {/* TODO: Remplacer par les vrais paiements depuis l'API filtré par professeurId */}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         );

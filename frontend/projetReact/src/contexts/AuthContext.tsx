@@ -9,6 +9,7 @@ interface User {
   name: string;
   role: UserRole;
   professeurId?: number;
+  solde?: number;
 }
 
 interface AuthContextType {
@@ -59,7 +60,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           email: userData.email,
           name: `${userData.prenom} ${userData.nom}`,
           role: userRole,
-          professeurId: userData.professeurId
+          professeurId: userData.professeurId,
+          solde: userData.solde
         };
         
         setUser(authenticatedUser);

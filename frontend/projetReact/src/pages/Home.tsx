@@ -111,9 +111,7 @@ const Home: React.FC = () => {
             </div>
           </div>
         </div>
-      </section>
-     
-     
+      </section> 
 
       {/* Footer Purple */}
       <section className="bg-[#a855f7] py-12 md:py-20">
@@ -178,79 +176,85 @@ const Home: React.FC = () => {
           </div>
         </div>
       </section>
-<section className="bg-[#ffffff] py-20">
-  <div className="px-6 md:px-16">
-    <div className="grid md:grid-cols-2 gap-16 items-center">
-      <div>
-        <h2 className="text-3xl font-serif font-bold text-gray-800 mb-6">Nos Professeurs Experts</h2>
-        <p className="text-gray-600 text-lg leading-relaxed mb-6">
-          Nos professeurs sont des experts reconnus dans leur domaine, sélectionnés pour leur expérience et leur passion pour l'enseignement.
-        </p>
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Prérequis pour enseigner :</h3>
-        <div className="space-y-4">
-          {[
-            { icon: GraduationCap, text: "Diplôme universitaire dans le domaine concerné" },
-            { icon: Users, text: "Au moins 3 ans d'expérience professionnelle" },
-            { icon: Award, text: "Certification pédagogique ou expérience d'enseignement" },
-            { icon: CheckCircle, text: "Engagement envers la qualité et l'innovation" }
-          ].map((item, idx) => (
-            <div key={idx} className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-[#a855f7] rounded-full flex items-center justify-center text-white shrink-0">
-                <item.icon size={20} />
+      <section className="bg-[#ffffff] py-20">
+        <div className="px-6 md:px-16">
+          <div className="grid md:grid-cols-2 gap-16 items-center">
+            <div>
+              <h2 className="text-3xl font-serif font-bold text-gray-800 mb-6">Nos Professeurs Experts</h2>
+              <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                Nos professeurs sont des experts reconnus dans leur domaine, sélectionnés pour leur expérience et leur passion pour l'enseignement.
+              </p>
+              <h3 className="text-xl font-bold text-gray-800 mb-4">Prérequis pour enseigner :</h3>
+              <div className="space-y-4">
+                {[
+                  { icon: GraduationCap, text: "Diplôme universitaire dans le domaine concerné" },
+                  { icon: Users, text: "Au moins 3 ans d'expérience professionnelle" },
+                  { icon: Award, text: "Certification pédagogique ou expérience d'enseignement" },
+                  { icon: CheckCircle, text: "Engagement envers la qualité et l'innovation" }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-[#a855f7] rounded-full flex items-center justify-center text-white shrink-0">
+                      <item.icon size={20} />
+                    </div>
+                    <p className="text-gray-600">{item.text}</p>
+                  </div>
+                ))}
               </div>
-              <p className="text-gray-600">{item.text}</p>
+              <p className="text-gray-600 mt-6">
+                Cette rigueur nous permet d'offrir des formations de qualité supérieure, adaptées aux besoins du marché.
+              </p>
+              <button
+                onClick={() => navigate('/demande-formateur')}
+                className="mt-6 px-6 py-3 bg-[#a855f7] text-white rounded-lg font-medium hover:bg-[#9333ea] transition-colors"
+              >
+                Devenir formateur
+              </button>
             </div>
-          ))}
+            <div>
+              <img
+                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600"
+                alt="Professeurs"
+                className="w-full h-96 object-cover rounded-[30px] shadow-lg"
+              />
+            </div>
+          </div>
         </div>
-        <p className="text-gray-600 mt-6">
-          Cette rigueur nous permet d'offrir des formations de qualité supérieure, adaptées aux besoins du marché.
-        </p>
-      </div>
-      <div>
-        <img
-          src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600"
-          alt="Professeurs"
-          className="w-full h-96 object-cover rounded-[30px] shadow-lg"
-        />
-      </div>
-    </div>
-  </div>
-</section>
+      </section>
 
-    <section className="bg-[#a855f7]  py-20">
-      <div className="px-6 md:px-16">
-        <h2 className="text-3xl font-serif font-bold text-center text-white mb-12">Ils nous ont fait confiance</h2>
-        <div className="grid md:grid-cols-3 gap-8">
-          {[
-            {
-              quote: "Grâce à GOLEARN, j'ai pu acquérir de nouvelles compétences en développement web qui m'ont permis de décrocher un emploi incroyable.",
-              name: "Marie Dupont",
-              role: "Développeuse Front-End",
-              img: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150"
-            },
-            {
-              quote: "Les cours sont de qualité exceptionnelle et les professeurs sont très compétents. Une expérience d'apprentissage unique.",
-              name: "Jean Martin",
-              role: "Data Scientist",
-              img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
-            },
-            {
-              quote: "GOLEARN m'a aidé à me reconvertir professionnellement. Les formations sont pratiques et directement applicables.",
-              name: "Sophie Leroy",
-              role: "UX Designer",
-              img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150"
-            }
-          ].map((testimonial, idx) => (
-            <div key={idx} className="bg-white p-6 rounded-[20px] shadow-lg text-center">
-              <img src={testimonial.img} alt={testimonial.name} className="w-16 h-16 rounded-full mx-auto mb-4 object-cover" />
-              <p className="text-gray-600 italic mb-4">"{testimonial.quote}"</p>
-              <h4 className="font-bold text-gray-800">{testimonial.name}</h4>
-              <p className="text-sm text-gray-500">{testimonial.role}</p>
-            </div>
-          ))}
+      <section className="bg-[#a855f7]  py-20">
+        <div className="px-6 md:px-16">
+          <h2 className="text-3xl font-serif font-bold text-center text-white mb-12">Ils nous ont fait confiance</h2>
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                quote: "Grâce à GOLEARN, j'ai pu acquérir de nouvelles compétences en développement web qui m'ont permis de décrocher un emploi incroyable.",
+                name: "Marie Dupont",
+                role: "Développeuse Front-End",
+                img: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150"
+              },
+              {
+                quote: "Les cours sont de qualité exceptionnelle et les professeurs sont très compétents. Une expérience d'apprentissage unique.",
+                name: "Jean Martin",
+                role: "Data Scientist",
+                img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
+              },
+              {
+                quote: "GOLEARN m'a aidé à me reconvertir professionnellement. Les formations sont pratiques et directement applicables.",
+                name: "Sophie Leroy",
+                role: "UX Designer",
+                img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150"
+              }
+            ].map((testimonial, idx) => (
+              <div key={idx} className="bg-white p-6 rounded-[20px] shadow-lg text-center">
+                <img src={testimonial.img} alt={testimonial.name} className="w-16 h-16 rounded-full mx-auto mb-4 object-cover" />
+                <p className="text-gray-600 italic mb-4">"{testimonial.quote}"</p>
+                <h4 className="font-bold text-gray-800">{testimonial.name}</h4>
+                <p className="text-sm text-gray-500">{testimonial.role}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
 
       <section className="bg-white py-20">
         <div className="px-6 md:px-16 text-center">
@@ -259,7 +263,9 @@ const Home: React.FC = () => {
             Rejoignez des milliers d'apprenants et commencez votre voyage vers de nouvelles compétences. Inscrivez-vous dès aujourd'hui !
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-3 bg-[#a855f7] text-white rounded-full font-bold hover:bg-[#a855f7] transition cursor-pointer">
+            <button 
+              onClick={() => navigate('/register')}
+              className="px-8 py-3 bg-[#a855f7] text-white rounded-full font-bold hover:bg-[#a855f7] transition cursor-pointer">
               S'inscrire gratuitement
             </button>
             <button 

@@ -71,4 +71,17 @@ export class PaiementController {
             return FormaterResponse.failed(res, "Paiement non trouvé", 404);
         }
     }
+
+    static async webhookConfirmation(req: Request, res: Response) {
+        try {
+            // Appeler le service pour traiter la confirmation de paiement
+            await paiementService.confirmPaiement(req.body);
+            
+            // Orange Money attend obligatoirement un statut 200 OK
+            return res.status(200).send('OK');
+        } catch (error: any) {
+            // Même en cas d'erreur on retourne 200 pour éviter que Orange réessaye indéfiniment
+            return res.status(200).send('OK');
+        }
+    }
 }

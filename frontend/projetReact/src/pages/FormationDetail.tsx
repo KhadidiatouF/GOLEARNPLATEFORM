@@ -4,6 +4,7 @@ import { Clock, Users, Award, CheckCircle, PlayCircle, Star } from 'lucide-react
 import Header from '../components/Header';
 import PaymentModal from '../components/PaymentModal';
 import { useAuth } from '../contexts/AuthContext';
+import { apiFormation } from '../api/apiFormation';
 
 interface Session {
   id: number;
@@ -116,79 +117,38 @@ const FormationDetail: React.FC = () => {
     }, 2000);
   };
 
+  // Charger la formation depuis l'API
   useEffect(() => {
-    // Données mock pour toutes les formations
-    const mockCoursList: Cours[] = [
-      {
-        id: 1,
-        titre: 'Développement Web Complet',
-        description: 'Apprenez HTML, CSS, JavaScript, React et Node.js pour devenir développeur web full-stack. Ce cours complet vous guidera à travers les fondamentaux du développement web.',
-        typeCours: 'GRATUIT',
-        prix: 0,
-        estCertifiant: true,
-        sessions: [
-          { id: 1, dateDebut: '2026-03-01', dateFin: '2026-03-15' },
-          { id: 2, dateDebut: '2026-03-16', dateFin: '2026-03-30' },
-        ]
-      },
-      {
-        id: 2,
-        titre: 'Data Science avec Python',
-        description: 'Maîtrisez Python, Pandas, NumPy et Machine Learning pour analyser des données. Apprenez à manipuler de grands ensembles de données et à créer des modèles prédictifs.',
-        typeCours: 'PAYANT',
-        prix: 35000,
-        estCertifiant: true,
-        sessions: [
-          { id: 1, dateDebut: '2026-03-01', dateFin: '2026-03-22' },
-          { id: 2, dateDebut: '2026-03-23', dateFin: '2026-04-14' },
-          { id: 3, dateDebut: '2026-04-15', dateFin: '2026-05-07' },
-          { id: 4, dateDebut: '2026-05-08', dateFin: '2026-05-30' },
-        ]
-      },
-      {
-        id: 3,
-        titre: 'UX/UI Design Professionnel',
-        description: 'Concevez des interfaces utilisateur intuitives et attrayantes. Apprenez les principes du design et les outils professionnels.',
-        typeCours: 'PAYANT',
-        prix: 25000,
-        estCertifiant: true,
-        sessions: [
-          { id: 1, dateDebut: '2026-03-01', dateFin: '2026-03-21' },
-          { id: 2, dateDebut: '2026-03-22', dateFin: '2026-04-12' },
-          { id: 3, dateDebut: '2026-04-13', dateFin: '2026-05-04' },
-        ]
-      },
-      {
-        id: 4,
-        titre: 'Cybersécurité',
-        description: 'Apprenez à protéger les systèmes et les données contre les cybermenaces. Maîtrisez les techniques de Ethical Hacking et de sécurité réseau.',
-        typeCours: 'PAYANT',
-        prix: 50000,
-        estCertifiant: true,
-        sessions: [
-          { id: 1, dateDebut: '2026-03-01', dateFin: '2026-04-01' },
-          { id: 2, dateDebut: '2026-04-02', dateFin: '2026-05-01' },
-        ]
-      },
-      {
-        id: 5,
-        titre: 'Intelligence Artificielle',
-        description: 'Explorez les concepts avancés de l IA et du Deep Learning. Apprenez à créer des modèles de Machine Learning et des réseaux de neurones.',
-        typeCours: 'PAYANT',
-        prix: 60000,
-        estCertifiant: true,
-        sessions: [
-          { id: 1, dateDebut: '2026-03-01', dateFin: '2026-04-15' },
-          { id: 2, dateDebut: '2026-04-16', dateFin: '2026-05-30' },
-        ]
+    const loadFormation = async () => {
+      if (!id) {
+        setLoading(false);
+        return;
       }
-    ];
-
-    const courseId = parseInt(id || '1');
-    const selectedCourse = mockCoursList.find(c => c.id === courseId);
-    // eslint-disable-next-line
-    setCours(selectedCourse || null);
-    setLoading(false);
+      
+      try {
+        const courseId = parseInt(id);
+        const response = await apiFormation.getOneFormation(courseId);
+        
+        if (response && response.data) {
+          const formation = response.data;
+          setCours({
+            id: formation.id,
+            titre: formation.titre,
+            description: formation.description,
+            typeCours: formation.typeCours,
+            prix: formation.prix,
+            estCertifiant: formation.statut === 'VALIDATED',
+            sessions: formation.sessions || []
+          });
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement de la formation:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadFormation();
   }, [id]);
 
   const isGratuit = cours?.prix === 0;
