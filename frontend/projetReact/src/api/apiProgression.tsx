@@ -69,5 +69,21 @@ export const apiProgression = {
       console.error('Erreur lors de la récupération des progressions:', error);
       throw error;
     }
-  }
+  },
+
+  // // Sauvegarder le score d'un quiz de session
+  // saveQuizScore: async (data: { sessionId: number; score: number; passed: boolean }) => {
+  //   try {
+  //     const response = await fetch(`${BASE_URL}/progressions/quiz`, {
+  //       method: 'POST',
+  //       headers: getAuthHeaders(),
+  //       body: JSON.stringify(data)
+  //     });
+  //     if (!response.ok) throw new Error("Erreur lors de la sauvegarde du score quiz");
+  //     return await response.json();
+  //   } catch (error) {
+  //     console.error('Erreur sauvegarde score quiz:', error);
+  //     throw error;
+  //   }
+  // }
 };

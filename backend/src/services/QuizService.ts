@@ -58,6 +58,11 @@ export class QuizService {
         return this.quizRepo.delete(id);
     }
 
+    // ✅ Récupérer le quiz final d'une formation
+    async getFinalQuiz(formationId: number) {
+        return this.quizRepo.findFinalQuizByFormation(formationId);
+    }
+
     /**
      * LOGIQUE MÉTIER: Calculer le résultat d'un quiz
      * 

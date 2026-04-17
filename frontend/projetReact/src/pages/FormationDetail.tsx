@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Clock, Users, Award, CheckCircle, PlayCircle, Star } from 'lucide-react';
+import { Clock, Users, Award, CheckCircle, PlayCircle, Star, Lock } from 'lucide-react';
 import Header from '../components/Header';
 import PaymentModal from '../components/PaymentModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ interface Session {
   id: number;
   dateDebut: string;
   dateFin: string;
+  completed: boolean;
 }
 
 interface Cours {
@@ -337,18 +338,31 @@ const FormationDetail: React.FC = () => {
           </h2>
           
           <div className="space-y-4">
-            {cours.sessions.map((session, index) => (
+            {cours.sessions.map((session, index) => {
+              // ✅ VÉRIFICATION ACCÈS SESSION
+              const isFirstSession = index === 0;
+              const previousSessionCompleted = index > 0 ? cours.sessions[index - 1].completed === true : true;
+              const sessionAccessible = isFirstSession || previousSessionCompleted;
+
+              return (
               <div 
                 key={session.id}
-                className="border border-gray-200 rounded-xl p-4 hover:border-[#a855f7] transition cursor-pointer"
+                className={`border rounded-xl p-4 transition ${
+                  sessionAccessible 
+                    ? "border-gray-200 hover:border-[#a855f7] cursor-pointer" 
+                    : "border-gray-100 bg-gray-50 cursor-not-allowed opacity-60"
+                }`}
+                onClick={() => sessionAccessible && console.log('Ouvrir session', session.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#a855f7] text-white rounded-full flex items-center justify-center font-bold">
+                    <div className={`w-10 h-10 text-white rounded-full flex items-center justify-center font-bold ${
+                      sessionAccessible ? "bg-[#a855f7]" : "bg-gray-300"
+                    }`}>
                       {index + 1}
                     </div>
                     <div>
-                      <h4 className="font-bold text-gray-800">
+                      <h4 className={`font-bold ${sessionAccessible ? "text-gray-800" : "text-gray-400"}`}>
                         Semaine {index + 1}
                       </h4>
                       <p className="text-gray-500 text-sm">
@@ -356,10 +370,14 @@ const FormationDetail: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <PlayCircle className="text-gray-400 hover:text-[#a855f7]" size={24} />
+                  {sessionAccessible ? (
+                    <PlayCircle className="text-gray-400 hover:text-[#a855f7]" size={24} />
+                  ) : (
+                    <Lock className="text-gray-300" size={24} />
+                  )}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </section>

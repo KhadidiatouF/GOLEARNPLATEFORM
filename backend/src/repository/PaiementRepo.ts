@@ -1,4 +1,4 @@
-import { PrismaClient, Paiement } from "@prisma/client";
+import { PrismaClient, Paiement, Prisma } from "@prisma/client";
 import { IRepository } from "./IRepository";
 
 export class PaiementRepo implements IRepository<Paiement> {
@@ -12,19 +12,16 @@ export class PaiementRepo implements IRepository<Paiement> {
 
     const skip = (page - 1) * limit;
 
-    const whereClause = professeurId
-        ? {
-            apprenant: {
-                formations: {
-                    some: {
-                        formation: {
-                            professeurId: professeurId
-                        }
-                    }
-                }
+    // ✅ CORRECTION : Maintenant la relation directe existe dans Paiement
+   const whereClause = professeurId
+    ? {
+        apprenantFormation: {
+            formation: {
+                professeurId: professeurId
             }
         }
-        : {};
+    }
+    : {};
 
     const [paiements, total] = await Promise.all([
         this.prisma.paiement.findMany({
@@ -32,16 +29,16 @@ export class PaiementRepo implements IRepository<Paiement> {
             take: limit,
             where: whereClause,
             include: {
-                apprenant: {
+               apprenantFormation: {
                     include: {
-                        utilisateur: true,
-                        formations: {
+                        apprenant: {
                             include: {
-                                formation: true
+                                utilisateur: true
                             }
-                        }
+                        },
+                        formation: true
                     }
-                }
+                },
             },
             orderBy: { datePaiement: 'desc' }
         }),
@@ -51,21 +48,34 @@ export class PaiementRepo implements IRepository<Paiement> {
     return { data: paiements, total, page, limit };
 }
 
-    async findById(id: number): Promise<any> {
+   async findById(id: number): Promise<any> {
         return await this.prisma.paiement.findUnique({
             where: { id },
-            include: { apprenant: { include: { utilisateur: true } } }
+            include: {
+                apprenantFormation: {
+                    include: {
+                        apprenant: {
+                            include: {
+                                utilisateur: true
+                            }
+                        },
+                        formation: true
+                    }
+                }
+            }
         });
     }
 
-    async create(data: Omit<Paiement, "id">): Promise<Paiement> {
+    async create(data: Prisma.PaiementCreateInput): Promise<Paiement> {
         return await this.prisma.paiement.create({ data });
     }
 
-    async update(id: number, data: Paiement): Promise<Paiement> {
-        return await this.prisma.paiement.update({ where: { id }, data });
+    async update(id: number, data: Prisma.PaiementUpdateInput): Promise<Paiement> {
+        return await this.prisma.paiement.update({
+            where: { id },
+            data
+        });
     }
-
     async delete(id: number): Promise<void> {
         await this.prisma.paiement.delete({ where: { id } });
     }

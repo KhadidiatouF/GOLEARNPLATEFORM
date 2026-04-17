@@ -162,6 +162,28 @@ export class FormationService {
                 }
             }
 
+            // ✅ CRÉATION AUTOMATIQUE DU QUIZ FINAL
+            // Créé silencieusement à la fin de la transaction, aucun changement sur l'existant
+            if (data.quizFinal && data.quizFinal.questions && data.quizFinal.questions.length > 0) {
+              const finalQuiz = await prisma.quiz.create({
+                data: {
+                  formationId: formation.id,
+                  type: 'FINAL',
+                  questions: {
+                    create: data.quizFinal.questions.map((questionData: any) => ({
+                      contenu: questionData.contenu,
+                      reponses: {
+                        create: questionData.reponses.map((reponseData: any) => ({
+                          contenu: reponseData.contenu,
+                          estCorrecte: reponseData.estCorrecte
+                        }))
+                      }
+                    }))
+                  }
+                }
+              });
+            }
+
             // Retourner la formation créée avec toutes ses données
             return await prisma.formation.findUnique({
                 where: { id: formation.id },

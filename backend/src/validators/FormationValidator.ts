@@ -68,7 +68,8 @@ export const completeFormationSchema = z.object({
     professeurId: z.number().int().positive("L'ID du professeur doit être un nombre positif"),
     
     // Tableau des sessions (modules)
-    sessions: z.array(sessionDataSchema).min(1, "Au moins une session est requise")
+    sessions: z.array(sessionDataSchema).min(1, "Au moins une session est requise"),
+    quizFinal: quizDataSchema.optional()
 });
 
 // Type inféré du schéma

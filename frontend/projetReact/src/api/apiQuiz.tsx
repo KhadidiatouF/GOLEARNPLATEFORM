@@ -122,5 +122,19 @@ export const apiQuiz = {
       console.error('Erreur lors du fetch du résumé:', error);
       throw error;
     }
+  },
+
+  getFinalQuiz: async (formationId: number) => {
+    try {
+      const response = await fetch(`${BASE_URL}/quiz/final/${formationId}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error("Erreur lors du fetch du quiz final");
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur lors du fetch du quiz final:', error);
+      throw error;
+    }
   }
 };

@@ -968,7 +968,7 @@ console.log("✅ Inscriptions créées");
       where: { id: 1 },
       update: {},
       create: {
-        montant: 50000, moyenPaiement: "WAVE", apprenantId: app1.id,
+        montant: 50000, moyenPaiement: "WAVE", apprenantFormationId: app1.id,
       },
     });
   }
@@ -978,7 +978,7 @@ console.log("✅ Inscriptions créées");
       where: { id: 2 },
       update: {},
       create: {
-        montant: 50000, moyenPaiement: "OM", apprenantId: app2.id,
+        montant: 50000, moyenPaiement: "OM", apprenantFormationId: app2.id,
       },
     });
   }
@@ -988,7 +988,7 @@ console.log("✅ Inscriptions créées");
       where: { id: 3 },
       update: {},
       create: {
-        montant: 75000, moyenPaiement: "WAVE", apprenantId: app1.id,
+        montant: 75000, moyenPaiement: "WAVE", apprenantFormationId: app1.id,
       },
     });
   }
@@ -1005,6 +1005,85 @@ console.log("✅ Inscriptions créées");
     });
   }
   console.log("✅ Certifications créées");
+
+  // ==================== PROGRESSION EXEMPLE APPRENANT ====================
+  console.log("🌱 Création des données de progression exemple...");
+
+  // Liste des apprenants et formations pour lesquels on ajoute une progression
+  const progressionsExemples = [
+    { login: "apprenant_aminata", rechercheFormation: "React" },
+    { login: "apprenant_malick", rechercheFormation: "Node.js" },
+    { login: "apprenant_fatou", rechercheFormation: "JavaScript" }
+  ];
+
+  for (const exemple of progressionsExemples) {
+    // Récupérer l'apprenant
+    const apprenantUser = await prisma.utilisateur.findUnique({ 
+      where: { login: exemple.login },
+      include: { apprenant: true }
+    });
+
+    // Récupérer la formation
+    const formation = await prisma.formation.findFirst({ 
+      where: { titre: { contains: exemple.rechercheFormation } }
+    });
+
+    if (apprenantUser?.apprenant && formation) {
+
+      // 1. Lier l'apprenant à la formation
+      const apprenantFormation = await prisma.apprenantFormation.upsert({
+        where: { 
+          apprenantId_formationId: { 
+            apprenantId: apprenantUser.apprenant.id, 
+            formationId: formation.id 
+          }
+        },
+        create: {
+          apprenantId: apprenantUser.apprenant.id,
+          formationId: formation.id
+        },
+        update: {}
+      });
+
+      // 2. Créer l'entrée Progression
+      const progression = await prisma.progression.upsert({
+        where: { apprenantFormationId: apprenantFormation.id },
+        create: {
+          apprenantFormationId: apprenantFormation.id
+        },
+        update: {}
+      });
+
+      // 3. Récupérer tous les chapitres de la formation
+      const chapitres = await prisma.chapitre.findMany({ 
+        where: { session: { formationId: formation.id } },
+        orderBy: { id: 'asc' }
+      });
+
+      // 4. Marquer les 3 premiers chapitres comme complétés pour avoir une progression exemple
+      for (let i = 0; i < 3 && i < chapitres.length; i++) {
+        await prisma.apprenantChapitre.upsert({
+          where: {
+            progressionId_chapitreId: {
+              progressionId: progression.id,
+              chapitreId: chapitres[i].id
+            }
+          },
+          create: {
+            progressionId: progression.id,
+            chapitreId: chapitres[i].id,
+            estComplete: true,
+            dateCompletion: new Date()
+          },
+          update: {
+            estComplete: true
+          }
+        });
+      }
+
+      console.log(`✅ Progression créée pour ${exemple.login} sur la formation ${formation.titre}`);
+    }
+  }
 
   console.log("===========================================");
   console.log("✅ SEED TERMINÉ AVEC SUCCÈS !");

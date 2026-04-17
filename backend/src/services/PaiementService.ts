@@ -18,6 +18,8 @@ export class PaiementService {
         return this.paiementRepo.findById(id);
     }
 
+    
+
     async createPaiement(data: any) {
         // Créer le paiement avec statut en attente
         // AUCUN PARTAGE, AUCUN ACCES ICI
@@ -27,6 +29,14 @@ export class PaiementService {
     async confirmPaiement(data: any) {
         // ✅ SEULEMENT ICI APRES CONFIRMATION WEBHOOK
         // On ne fait le partage que quand Orange Money confirme le paiement
+
+        // ✅ Mettre à jour le statut du paiement en VALIDE
+        await this.paiementRepo.update(data.paiementId, {
+            statut: 'VALIDE',
+            transactionId: data.transactionId,
+            reference: data.reference,
+            callbackData: data
+        });
         
         // Récupérer la formation pour obtenir le professeur
         const formation = await this.prisma.formation.findUnique({
@@ -60,7 +70,7 @@ export class PaiementService {
                 }
             });
 
-            // ✅ Ajouter l'apprenant à la formation pour lui donner accès
+            // ✅ Ajouter l'apprenant à la formation pour lui donner accès (déblocage automatique)
             await this.prisma.apprenantFormation.create({
                 data: {
                     apprenantId: data.apprenantId,

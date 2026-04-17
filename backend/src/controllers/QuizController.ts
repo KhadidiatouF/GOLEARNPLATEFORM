@@ -35,6 +35,21 @@ export class QuizController {
         }
     }
 
+    static async getFinalQuiz(req: Request, res: Response, next: NextFunction) {
+        try {
+            const formationId: number = Number(req.params.formationId);
+            const quiz = await quizService.getFinalQuiz(formationId);
+            
+            if (quiz) {
+                FormaterResponse.success(res, quiz, "Quiz final récupéré avec succès", HttpCode.OK);
+            } else {
+                FormaterResponse.failed(res, "Quiz final non trouvé pour cette formation", 404);
+            }
+        } catch (error) {
+            next(error);
+        }
+    }
+
     static async createQuiz(req: Request, res: Response, next: NextFunction) {
         try {
             const data = quizSchema.parse(req.body);

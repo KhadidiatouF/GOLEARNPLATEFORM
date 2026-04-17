@@ -14,5 +14,6 @@ router.delete("/:id", authenticate, QuizController.deleteQuiz);
 router.post("/:id/submit", authenticate, QuizController.submitQuiz);
 router.get("/formation/:formationId/can-take-final", authenticate, QuizController.checkCanTakeFinalQuiz);
 router.get("/formation/:formationId/summary", authenticate, QuizController.getQuizSummary);
+router.get("/final/:formationId", authenticate, QuizController.getFinalQuiz);
 
 export default router;

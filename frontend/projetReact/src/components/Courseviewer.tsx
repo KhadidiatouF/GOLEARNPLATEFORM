@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { apiQuiz } from '../api/apiQuiz';
 import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -9,7 +10,10 @@ interface PdfContentProps { content: { pdfUrl: string; description?: string; bod
 interface QuizQuestion { id: number; question: string; options: string[]; correct: number; }
 interface QuizContentProps { content: { questions: QuizQuestion[] }; onSuccess?: () => void; }
 
-// État pour suivre la progression d'une session
+interface FinalQuizResponse {
+  questions: QuizQuestion[];
+}
+
 interface SessionProgress {
   currentChapterIndex: number;
   chaptersCompleted: boolean[];
@@ -17,13 +21,12 @@ interface SessionProgress {
   quizScore: number | null;
 }
 
-// État pour le quiz final
 interface FinalQuizState {
   showFinalQuiz: boolean;
   passed: boolean;
   score: number | null;
-  average: number; // Moyenne des quiz de session
-  allPassed: boolean; // Tous les quiz réussis?
+  average: number;
+  allPassed: boolean;
 }
 
 interface ChapitreContent {
@@ -41,7 +44,6 @@ interface Chapitre {
   completed: boolean;
   locked: boolean;
   content: ChapitreContent;
-  // Propriétés API (français)
   titre?: string;
   typeContenu?: string;
   duree?: string;
@@ -60,7 +62,6 @@ interface Session {
   content: { body?: string; breadcrumb?: string[] };
   chapitres?: Chapitre[];
   quiz?: unknown;
-  // Propriétés API (français)
   titre?: string;
   duree?: string;
   contenu?: string;
@@ -152,12 +153,10 @@ function typeBadge(type: string): string {
 }
 
 function ArticleContent({ content, title, onContentViewed }: { content: { body: string; breadcrumb?: string[] }; title: string; onContentViewed?: () => void }) {
-  // Appeler onContentViewed quand le composant est monté (contenu affiché)
   useEffect(() => {
-    if (onContentViewed) {
-      onContentViewed();
-    }
+    if (onContentViewed) onContentViewed();
   }, [onContentViewed]);
+
   const renderMarkdown = (text: string) => {
     const lines = text.trim().split("\n");
     const elements: React.ReactNode[] = [];
@@ -188,6 +187,7 @@ function ArticleContent({ content, title, onContentViewed }: { content: { body: 
     }
     return elements;
   };
+
   return (
     <div className="w-full">
       <h1 className="text-2xl font-bold text-gray-900 mb-3">{title}</h1>
@@ -197,17 +197,13 @@ function ArticleContent({ content, title, onContentViewed }: { content: { body: 
 }
 
 function VideoContent({ content, title, onContentViewed }: VideoContentProps) {
-  // Le body contient le contenu Markdown du chapitre
   const videoContent = content as { videoUrl?: string; description?: string; body?: string };
   const markdownContent = videoContent.body || videoContent.description || '';
-  
-  // Appeler onContentViewed quand le composant est monté (contenu affiché)
+
   useEffect(() => {
-    if (onContentViewed) {
-      onContentViewed();
-    }
+    if (onContentViewed) onContentViewed();
   }, [onContentViewed]);
-  
+
   return (
     <div className="w-full">
       <div className="rounded-2xl overflow-hidden shadow-lg bg-black aspect-video mb-6">
@@ -227,15 +223,13 @@ function VideoContent({ content, title, onContentViewed }: VideoContentProps) {
 
 function PdfContent({ content, title, onContentViewed }: PdfContentProps) {
   const pdfContent = content as { pdfUrl?: string; description?: string; body?: string };
-  
-  // Appeler onContentViewed quand le composant est monté (contenu affiché)
+
   useEffect(() => {
-    if (onContentViewed) {
-      onContentViewed();
-    }
+    if (onContentViewed) onContentViewed();
   }, [onContentViewed]);
+
   const markdownContent = pdfContent.body || pdfContent.description || '';
-  
+
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
       <div className="w-20 h-20 bg-red-50 rounded-2xl flex items-center justify-center mb-4 border border-red-100"><BookOpen size={36} className="text-red-400" /></div>
@@ -263,7 +257,7 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
   const totalQuestions = content.questions.length;
   const percentage = Math.round((score / totalQuestions) * 100);
   const passed = percentage >= 60;
-  
+
   const handleContinue = () => {
     if (passed && onSuccess) {
       onSuccess();
@@ -272,7 +266,7 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
       setSubmitted(false);
     }
   };
-  
+
   return (
     <div className="w-full max-w-xl">
       <div className="flex items-center gap-3 mb-6">
@@ -291,7 +285,7 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
                   {passed ? '🎉 Félicitations !' : '❌ Échoué'}
                 </p>
                 <p className={`text-sm ${passed ? 'text-green-700' : 'text-red-700'}`}>
-                  {passed 
+                  {passed
                     ? `Vous avez obtenu ${percentage}% - Vous passez à la suite !`
                     : `Vous avez obtenu ${percentage}%. Vous avez besoin de 60% pour continuer. Réessayez !`
                   }
@@ -303,7 +297,7 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
             <p className="text-3xl font-bold text-gray-900">{score}/{totalQuestions}</p>
             <p className="text-gray-500 mt-1">bonnes réponses</p>
           </div>
-          <button onClick={handleContinue} className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors shadow-sm">
+          <button onClick={handleContinue} className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${passed ? 'bg-teal-500 hover:bg-teal-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
             {passed ? 'Passer à la session suivante' : 'Réessayer le quiz'}
           </button>
         </div>
@@ -332,14 +326,14 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
   );
 }
 
-// Wrapper pour le quiz avec callback de soumission
 interface QuizWrapperProps {
   content: { questions: QuizQuestion[] };
   onSubmit: (score: number) => void;
+  onSuccess?: () => void;
   requiredScore?: number;
 }
 
-function QuizWrapper({ content, onSubmit, requiredScore = 60 }: QuizWrapperProps) {
+function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60 }: QuizWrapperProps) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const correctCount = submitted ? content.questions.filter((q) => answers[q.id] === q.correct).length : 0;
@@ -355,7 +349,6 @@ function QuizWrapper({ content, onSubmit, requiredScore = 60 }: QuizWrapperProps
   if (submitted) {
     return (
       <div className="relative">
-        {/* Bande de résultat en haut */}
         <div className={`mb-6 p-4 rounded-xl border-l-4 ${passed ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'}`}>
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${passed ? 'bg-green-100' : 'bg-red-100'}`}>
@@ -366,7 +359,7 @@ function QuizWrapper({ content, onSubmit, requiredScore = 60 }: QuizWrapperProps
                 {passed ? '🎉 Félicitations !' : '❌ Échoué'}
               </p>
               <p className={`text-sm ${passed ? 'text-green-700' : 'text-red-700'}`}>
-                {passed 
+                {passed
                   ? `Vous avez obtenu ${percentage}% - Vous passez à la session suivante !`
                   : `Vous avez obtenu ${percentage}%. Vous avez besoin de ${requiredScore}% pour continuer. Réessayez !`
                 }
@@ -374,15 +367,24 @@ function QuizWrapper({ content, onSubmit, requiredScore = 60 }: QuizWrapperProps
             </div>
           </div>
         </div>
-        
-        {/* Score détaillé */}
+
         <div className="text-center py-6 bg-white rounded-2xl border border-gray-100 shadow-sm mb-4">
           <p className="text-3xl font-bold text-gray-900">{correctCount}/{totalQuestions}</p>
           <p className="text-gray-500 mt-1">bonnes réponses</p>
         </div>
-        
-        {!passed && (
-          <button onClick={() => { setAnswers({}); setSubmitted(false); }} className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors shadow-sm">
+
+        {passed ? (
+          <button
+            onClick={() => { if (onSuccess) onSuccess(); }}
+            className="w-full py-3 bg-teal-500 text-white rounded-xl font-semibold hover:bg-teal-600 transition-colors shadow-sm"
+          >
+            Passer à la session suivante
+          </button>
+        ) : (
+          <button
+            onClick={() => { setAnswers({}); setSubmitted(false); }}
+            className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors shadow-sm"
+          >
             Réessayer le quiz
           </button>
         )}
@@ -417,64 +419,44 @@ interface CourseViewerProps { onBack: () => void; formationId?: number; }
 
 export default function CourseViewer({ onBack, formationId }: CourseViewerProps) {
   const location = useLocation();
-  
-  // État pour les données de la formation
+
   const [formation, setFormation] = useState<FormationData>(mockFormation as unknown as FormationData);
   const [loading, setLoading] = useState(true);
-  
-  // Charger la formation depuis l'API
+
   useEffect(() => {
     const loadFormation = async () => {
-      // Utiliser l'ID de la formation passé en prop ou depuis le state
       const formationID = formationId || location.state?.formationId;
-      
+
       if (!formationID) {
         setLoading(false);
         return;
       }
-      
+
       try {
         const response = await fetch(`http://localhost:4004/formations/${formationID}`);
-        console.log('API Response status:', response.status);
         if (response.ok) {
           const data = await response.json();
-          console.log('API Data:', JSON.stringify(data, null, 2));
-          // Transformer les données de l'API vers le format attendu
           if (data.data) {
             const formationData = data.data;
-            console.log('Formation sessions:', formationData.sessions);
-            
-            // Si pas de sessions, on affiche quand meme les donnees de la formation
             const professorData = formationData.professeur;
-            const profName = professorData?.utilisateur 
-              ? `${professorData.utilisateur.nom} ${professorData.utilisateur.prenom}` 
+            const profName = professorData?.utilisateur
+              ? `${professorData.utilisateur.nom} ${professorData.utilisateur.prenom}`
               : 'Professeur';
             const profSpecialty = professorData?.specialite || 'Formation';
             const profAvatar = 'https://i.pravatar.cc/80?img=47';
             const profVerified = true;
 
-            // Si pas de sessions, on affiche quand meme les donnees de la formation
-            // (peut etre une formation vide ou en cours de creation)
             if (!formationData.sessions || formationData.sessions.length === 0) {
-              console.log('API returned no sessions, but using real formation data');
               setFormation({
                 id: formationData.id,
                 title: formationData.titre,
                 description: formationData.description,
                 progress: 0,
                 sessions: [],
-                professor: {
-                  name: profName,
-                  role: 'PROFESSEUR',
-                  specialty: profSpecialty,
-                  avatar: profAvatar,
-                  verified: profVerified
-                }
+                professor: { name: profName, role: 'PROFESSEUR', specialty: profSpecialty, avatar: profAvatar, verified: profVerified }
               });
             } else {
-              // Transformer les sessions et leurs chapitres
               const transformedSessions = (formationData.sessions || []).map((session: Record<string, unknown>, index: number) => {
-                // Mapper tous les chapitres de la session
                 const chapitres = ((session.chapitres || []) as unknown as Chapitre[]).map((chapitre: Chapitre, chapIndex: number) => ({
                   id: Number(chapitre.id) || (index * 100 + chapIndex + 1),
                   title: String(chapitre.titre || ''),
@@ -483,23 +465,20 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                   duration: String(chapitre.duree || '15 min'),
                   completed: false,
                   locked: chapIndex > 0,
-                  content: { 
+                  content: {
                     body: String(chapitre.contenu || 'Contenu du chapitre...'),
                     videoUrl: chapitre.videoUrl || undefined,
                     pdfUrl: chapitre.pdfUrl || undefined,
                     description: String(chapitre.contenu || '')
                   },
-                  // Conserver les données originales pour affichage
                   titre: chapitre.titre,
                   duree: chapitre.duree,
                   contenu: chapitre.contenu,
                   videoUrl: chapitre.videoUrl,
                   pdfUrl: chapitre.pdfUrl
                 }));
-                
-                // Determiner le type de session
+
                 const apiQuiz = session.quiz as Record<string, unknown> | undefined;
-                // Transformer le quiz au format attendu par le composant
                 const quiz = apiQuiz && apiQuiz.questions ? {
                   content: {
                     questions: ((apiQuiz.questions as unknown[]) || []).map((q: unknown) => {
@@ -520,46 +499,28 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                     })
                   }
                 } : undefined;
+
                 const premierChapitre = chapitres[0];
-                
-                // Mapper le type de contenu (VIDEO, TEXTE, PDF)
                 const chapterType = premierChapitre?.typeContenu?.toLowerCase() || 'texte';
-                // TEXTE est affiche comme article
                 const sessionType = chapterType === 'texte' ? 'article' : chapterType;
-                
-                // Mapper le contenu selon le type - avec toutes les infos du chapitre
+
                 let sessionContent: Record<string, unknown> = { body: String(session.contenu || '') };
-                
+
                 if (premierChapitre) {
                   if (sessionType === 'video' || premierChapitre.typeContenu === 'VIDEO') {
-                    sessionContent = {
-                      videoUrl: premierChapitre.content.videoUrl,
-                      description: premierChapitre.content.description || premierChapitre.content.body,
-                      body: premierChapitre.content.body // Ajouter le body pour affichage sous la vidéo
-                    };
+                    sessionContent = { videoUrl: premierChapitre.content.videoUrl, description: premierChapitre.content.description || premierChapitre.content.body, body: premierChapitre.content.body };
                   } else if (sessionType === 'pdf' || premierChapitre.typeContenu === 'PDF') {
-                    sessionContent = {
-                      pdfUrl: premierChapitre.content.pdfUrl,
-                      description: premierChapitre.content.description || premierChapitre.content.body,
-                      body: premierChapitre.content.body
-                    };
+                    sessionContent = { pdfUrl: premierChapitre.content.pdfUrl, description: premierChapitre.content.description || premierChapitre.content.body, body: premierChapitre.content.body };
                   } else {
-                    sessionContent = { 
-                      body: premierChapitre.content.body,
-                      description: premierChapitre.content.description
-                    };
+                    sessionContent = { body: premierChapitre.content.body, description: premierChapitre.content.description };
                   }
                 }
-                
-                // ✅ CORRECTION : Ajouter le quiz SANS écraser le contenu des chapitres
-                // On stocke le quiz dans une propriété séparée, il sera affiché APRES tous les chapitres
+
                 if (quiz && quiz.content) {
                   const quizInner = quiz.content as Record<string, unknown>;
                   if (quizInner.questions) {
-                    sessionContent = { 
+                    sessionContent = {
                       ...sessionContent,
-                      // On ne met plus les questions directement à la racine
-                      // elles sont stockées dans une propriété dédiée quizQuestions
                       quizQuestions: (quizInner.questions as Record<string, unknown>[]).map((q: Record<string, unknown>, qIdx: number) => ({
                         id: Number(q.id) || (qIdx + 1),
                         question: String(q.question || ''),
@@ -569,7 +530,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                     };
                   }
                 }
-                
+
                 return {
                   id: Number(session.id) || (index + 1),
                   title: String(session.titre || ''),
@@ -579,90 +540,83 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                   locked: false,
                   content: sessionContent,
                   chapitres: chapitres,
-                  quiz: quiz, // Ajouter le quiz transformé
-                  // Conserver les données originales
+                  quiz: quiz,
                   titre: session.titre,
                   duree: session.duree,
                   contenu: session.contenu
                 };
               });
-              
+
               setFormation({
                 id: formationData.id,
                 title: formationData.titre,
                 description: formationData.description,
                 progress: 0,
                 sessions: transformedSessions,
-                professor: {
-                  name: profName,
-                  role: 'PROFESSEUR',
-                  specialty: profSpecialty,
-                  avatar: profAvatar,
-                  verified: profVerified
-                }
+                professor: { name: profName, role: 'PROFESSEUR', specialty: profSpecialty, avatar: profAvatar, verified: profVerified }
               });
             }
           }
         }
       } catch (error) {
         console.error('Erreur chargement formation:', error);
-        // En cas d'erreur, utiliser les données mock
-        console.log('Using mock data as fallback - API error');
         setFormation(mockFormation as unknown as FormationData);
       } finally {
         setLoading(false);
       }
     };
-    
+
     loadFormation();
   }, [formationId, location.state?.formationId]);
 
   const [activeSessionId, setActiveSessionId] = useState<number | undefined>(undefined);
-  
-  // État pour la progression des sessions
   const [sessionProgress, setSessionProgress] = useState<Record<number, SessionProgress>>({});
-  
-  // État pour le quiz final
-  const [finalQuizState, setFinalQuizState] = useState<FinalQuizState>({
-    showFinalQuiz: false,
-    passed: false,
-    score: null,
-    average: 0,
-    allPassed: false
-  });
-  
-  // État pour afficher le quiz de session
+  const [finalQuizState, setFinalQuizState] = useState<FinalQuizState>({ showFinalQuiz: false, passed: false, score: null, average: 0, allPassed: false });
   const [showSessionQuiz, setShowSessionQuiz] = useState(false);
-  
-  // État pour suivre si le contenu du chapitre a été vu (obligation de lire avant de passer)
   const [chapterContentViewed, setChapterContentViewed] = useState(false);
+  const [showAverageWarning, setShowAverageWarning] = useState(false);
+  const [finalQuizQuestions, setFinalQuizQuestions] = useState<QuizQuestion[]>([]);
 
-  // Fonction pour gérer le passage au chapitre suivant
+  // ─────────────────────────────────────────────────────────────────────────
+  // ✅ CORRECTION : isSessionAccessible
+  // Vérifie que toutes les sessions précédentes ont leur quiz passé (si elles en ont un)
+  // ─────────────────────────────────────────────────────────────────────────
+  const isSessionAccessible = React.useCallback((index: number): boolean => {
+    // Toujours autoriser l'accès aux sessions déjà terminées
+    if (formation.sessions[index].completed) return true;
+    
+    if (index === 0) return true;
+
+    for (let i = 0; i < index; i++) {
+      const session = formation.sessions[i];
+      const progress = sessionProgress[session.id];
+      const hasQuiz = !!(session as unknown as { quiz?: unknown }).quiz;
+
+      // Si la session a un quiz et qu'il n'est pas passé → bloquer les suivantes
+      if (hasQuiz && !progress?.quizPassed) return false;
+    }
+
+    return true;
+  }, [formation.sessions, sessionProgress]);
+
   const handleNextChapter = () => {
     if (!activeSession) return;
-    
+
     const chapitres = activeSession.chapitres;
     const currentProgress = sessionProgress[activeSession.id];
-    
-    // Si la session a des chapitres
+
     if (chapitres && chapitres.length > 0) {
       const currentChapterIndex = currentProgress?.currentChapterIndex ?? 0;
-      
-      // Si ce n'est pas le dernier chapitre, passer au chapitre suivant
+
       if (currentChapterIndex < chapitres.length - 1) {
-        setSessionProgress({
-          ...sessionProgress,
-          [activeSession.id]: {
-            ...currentProgress,
-            currentChapterIndex: currentChapterIndex + 1
-          }
-        });
-        // Réinitialiser le flag pour le nouveau chapitre
+        setSessionProgress(prev => ({
+          ...prev,
+          [activeSession.id]: { ...prev[activeSession.id], currentChapterIndex: currentChapterIndex + 1 }
+        }));
         setChapterContentViewed(false);
         return;
       }
-      
-      // Si c'est le dernier chapitre, vérifier s'il y a un quiz
+
       if (activeSession.quiz) {
         const quizData = activeSession.quiz as Record<string, unknown>;
         const quizContent = quizData.content as Record<string, unknown> | undefined;
@@ -673,143 +627,138 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
         }
       }
     } else {
-      // Pas de chapitres, vérifier s'il y a un quiz directement
       if (activeSession.quiz) {
-        const quizData = activeSession.quiz as Record<string, unknown>;
-        const quizContent = quizData.content as Record<string, unknown> | undefined;
-        if (quizContent && quizContent.questions) {
-          console.log("Quiz trouvé pour la session (sans chapitres), affichage du quiz");
-          setShowSessionQuiz(true);
-          setChapterContentViewed(false);
-          return;
-        }
+        // ✅ Forcer l'affichage du quiz à la fin du chapitre
+        setShowSessionQuiz(true);
+        setChapterContentViewed(false);
+        return;
       }
     }
-    
-    // Pas de quiz ou quiz sans questions, passer à la session suivante
+
     handleNextSession();
   };
-  
-  // Fonction pour calculer la moyenne des quiz de session
+
   const calculateQuizAverage = (): { average: number; allPassed: boolean; failedSessions: number[] } => {
     const scores: number[] = [];
     const failedSessions: number[] = [];
-    
-    Object.values(sessionProgress).forEach((progress) => {
-      if (progress.quizPassed && progress.quizScore !== null) {
-        scores.push(progress.quizScore);
-      } else if (progress.quizScore !== null) {
-        // Quiz passé mais pas réussi
-        failedSessions.push(progress.quizScore);
+
+    formation.sessions.forEach((session: Session) => {
+      const progress = sessionProgress[session.id];
+      if (progress) {
+        if (progress.quizPassed && progress.quizScore !== null) {
+          scores.push(progress.quizScore);
+        } else if (session.quiz) {
+          // ✅ Toute session qui CONTIENT un quiz doit être réussie
+          if (!progress.quizPassed) {
+            failedSessions.push(session.id);
+          }
+        }
       }
     });
-    
-    const allPassed = failedSessions.length === 0 && scores.length > 0;
-    const average = scores.length > 0 
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-      : 0;
-    
+
+    // Compte seulement les sessions qui ont réellement un quiz
+    const totalQuizSessions = formation.sessions.filter((s: Session) => s.quiz).length;
+    const allPassed = failedSessions.length === 0 && totalQuizSessions > 0 && scores.length === totalQuizSessions;
+    const average = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+
     return { average, allPassed, failedSessions };
   };
-  
-  // Fonction pour gérer le passage à la session suivante
+
   const handleNextSession = () => {
     if (!activeSession) return;
-    
+
     if (activeIndex < formation.sessions.length - 1) {
-      // Marquer la session actuelle comme terminée
       setFormation((prev: FormationData) => {
         const newSessions = [...prev.sessions];
         newSessions[activeIndex] = { ...newSessions[activeIndex], completed: true };
         return { ...prev, sessions: newSessions };
       });
-      
-      // Passer à la session suivante
       setActiveSessionId(formation.sessions[activeIndex + 1].id);
     } else {
-      // C'était la dernière session - vérifier la moyenne des quiz
       const { average, allPassed } = calculateQuizAverage();
       
+      // ✅ DEBUG : Afficher dans la console les valeurs exactes
+      console.log("🔍 DEBUG CALCUL MOYENNE :");
+      console.log("   ✅ Moyenne calculée :", average, "%");
+      console.log("   ✅ Tous les quiz sont passés :", allPassed);
+      console.log("   ✅ Etat complet sessionProgress :", sessionProgress);
+      console.log("   ✅ Nombre de sessions dans la formation :", formation.sessions.length);
+
       if (allPassed && average >= 60) {
-        // Moyenne >= 60% et tous les quiz réussis - afficher le quiz final
-        setFinalQuizState({ showFinalQuiz: true, passed: false, score: null, average, allPassed: true });
+        // Charger les vraies questions du quiz final depuis la base de données
+        apiQuiz.getFinalQuiz(formation.id)
+          .then((quizData: FinalQuizResponse) => {
+            if (quizData && quizData.questions) {
+              setFinalQuizQuestions(quizData.questions);
+            }
+            setFinalQuizState({ showFinalQuiz: true, passed: false, score: null, average, allPassed: true });
+          })
+          .catch(() => {
+            // Fallback sur le mock si l'API échoue
+            setFinalQuizQuestions([{ id: 1, question: "Quiz final - À 100% vous pouvez obtenir votre certificat", options: ["Commencer le quiz final"], correct: 0 }]);
+            setFinalQuizState({ showFinalQuiz: true, passed: false, score: null, average, allPassed: true });
+          });
       } else {
-        // Moyenne < 60% ou certains quiz non réussis
-        alert(`Votre moyenne est de ${average}%. Vous devez avoir une moyenne >= 60% et réussir tous les quiz pour accéder au quiz final.`);
+        setShowAverageWarning(true);
       }
     }
   };
-  
-  // Fonction pour gérer la soumission du quiz de session
+
   const handleSessionQuizSubmit = (score: number) => {
     if (!activeSession) return;
     const sessionId = activeSession.id;
     const passed = score >= 60;
-    
+
     setSessionProgress((prev: Record<number, SessionProgress>) => ({
       ...prev,
-      [sessionId]: {
-        ...prev[sessionId],
-        quizPassed: passed,
-        quizScore: score
-      }
+      [sessionId]: { ...prev[sessionId], quizPassed: passed, quizScore: score }
     }));
-    
-    setShowSessionQuiz(false);
-    
-    if (passed) {
-      // Quiz réussi - passer automatiquement à la session suivante
-      handleNextSession();
-    } else {
-      // Quiz échoué - rester sur la session actuelle
-      // L'utilisateur peut réessayer depuis le composant QuizWrapper
-    }
   };
-  
-  // Fonction pour gérer la soumission du quiz final
+
   const handleFinalQuizSubmit = (score: number) => {
-    const passed = score >= 100; // 100% requis pour le certificat
+    const passed = score >= 100;
     setFinalQuizState({ showFinalQuiz: false, passed, score, average: 0, allPassed: false });
   };
 
-  // Initialiser la progression des sessions après le chargement des données
   useEffect(() => {
     if (!loading && formation.sessions && formation.sessions.length > 0) {
-      const initialProgress: Record<number, SessionProgress> = {};
-      
-      formation.sessions.forEach((session: Session) => {
-        const sessionData = session as unknown as { chapitres?: Chapitre[]; quiz?: unknown };
-        const chapters = sessionData.chapitres || [];
-        initialProgress[session.id] = {
-          currentChapterIndex: 0,
-          chaptersCompleted: new Array(chapters.length).fill(false),
-          quizPassed: false,
-          quizScore: null
-        };
+      setSessionProgress(prevProgress => {
+        const initialProgress: Record<number, SessionProgress> = { ...prevProgress };
+        let hasChanges = false;
+        
+        formation.sessions.forEach((session: Session) => {
+          // Ne JAMAIS écraser une progression déjà existante
+          if (!initialProgress[session.id]) {
+            const sessionData = session as unknown as { chapitres?: Chapitre[]; quiz?: unknown };
+            const chapters = sessionData.chapitres || [];
+            initialProgress[session.id] = {
+              currentChapterIndex: 0,
+              chaptersCompleted: new Array(chapters.length).fill(false),
+              quizPassed: false,
+              quizScore: null
+            };
+            hasChanges = true;
+          }
+        });
+        
+        // Ne pas déclencher de rerendu si rien n'a changé
+        return hasChanges ? initialProgress : prevProgress;
       });
-      
-      setSessionProgress(initialProgress);
     }
-  }, [loading, formation.sessions]);
-  
-  // Sélectionner automatiquement la première session non verrouillée au chargement
+  }, [loading, formation.id]); // ✅ Plus de dépendance sur formation.sessions !
+
   useEffect(() => {
     if (!loading && formation.sessions && formation.sessions.length > 0 && activeSessionId === undefined) {
       const firstUnlockedSession = formation.sessions.find((s: Session) => !s.locked);
-      if (firstUnlockedSession) {
-        setActiveSessionId(firstUnlockedSession.id);
-      }
+      if (firstUnlockedSession) setActiveSessionId(firstUnlockedSession.id);
     }
   }, [loading, formation.sessions, activeSessionId]);
-  
-  // Réinitialiser le flag de contenu vu quand on change de session
+
   useEffect(() => {
     setChapterContentViewed(false);
+    setShowSessionQuiz(false);
   }, [activeSessionId]);
 
-
-
-  // Afficher un chargement si nécessaire
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -817,16 +766,14 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
       </div>
     );
   }
-  
+
   if (!formation.sessions || formation.sessions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center px-4">
         <BookOpen size={60} className="text-gray-300 mb-4" />
         <h2 className="text-xl font-semibold text-gray-600 mb-2">Aucun contenu disponible</h2>
         <p className="text-gray-400 mb-6">Le contenu de cette formation est en cours de préparation.</p>
-        <button onClick={onBack} className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-          Retour aux formations
-        </button>
+        <button onClick={onBack} className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">Retour aux formations</button>
       </div>
     );
   }
@@ -834,21 +781,15 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
   const activeSession = formation.sessions.find((s: { id: number }) => s.id === activeSessionId);
   const activeIndex = formation.sessions.findIndex((s: { id: number }) => s.id === activeSessionId);
 
-
   const renderSessionContent = () => {
-    // ✅ FORCER L'AFFICHAGE DES CHAPITRES EN PREMIER SYSTÉMATIQUEMENT
-    // Même si showSessionQuiz est true on affiche d'abord les chapitres s'ils ne sont pas tous terminés
-    const allChaptersCompleted = activeSession?.chapitres ? 
-      activeSession.chapitres.length === 0 || 
-      !!sessionProgress[activeSession.id]?.chaptersCompleted?.every((c: boolean) => c) 
-    : false;
+    const allChaptersCompleted = activeSession?.chapitres
+      ? activeSession.chapitres.length === 0 || !!sessionProgress[activeSession.id]?.chaptersCompleted?.every((c: boolean) => c)
+      : false;
 
-    // Le quiz ne s'affiche QUE si explicitement demandé ET tous les chapitres terminés
     if (showSessionQuiz && activeSession?.quiz && allChaptersCompleted) {
       const quizContent = activeSession.quiz as Record<string, unknown>;
       const quizInner = quizContent.content as Record<string, unknown> | undefined;
       if (quizInner && quizInner.questions) {
-        // Les questions sont maintenant transformées avec la structure: { question, options, correct }
         const questions = (quizInner.questions as Record<string, unknown>[]).map((q, idx) => ({
           id: Number(q.id) || (idx + 1),
           question: String(q.question || q.contenu || ''),
@@ -866,17 +807,20 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                 <p className="text-sm text-gray-500">Répondez correctement à 60% des questions pour continuer</p>
               </div>
             </div>
-            <QuizWrapper 
+            <QuizWrapper
               content={{ questions }}
               onSubmit={handleSessionQuizSubmit}
+              onSuccess={() => {
+                setShowSessionQuiz(false);
+                handleNextSession();
+              }}
               requiredScore={60}
             />
           </div>
         );
       }
     }
-    
-    // Afficher le quiz final
+
     if (finalQuizState.showFinalQuiz) {
       return (
         <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
@@ -889,42 +833,32 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
               <p className="text-sm text-gray-500">Répondez correctement à 100% des questions pour obtenir votre certificat</p>
             </div>
           </div>
-          <QuizWrapper 
-            content={{ questions: [
-              { id: 1, question: "Quiz final - À 100% vous pouvez obtenir votre certificat", options: ["Commencer le quiz final"], correct: 0 }
-            ]}}
+          <QuizWrapper
+            content={{ questions: finalQuizQuestions }}
             onSubmit={handleFinalQuizSubmit}
             requiredScore={100}
           />
         </div>
       );
     }
-    
-    // Obtenir le contenu et le type du chapitre actuel basé sur currentChapterIndex
+
     const getCurrentChapterInfo = () => {
-      // ✅ CORRECTION : On vérifie D'ABORD si on doit afficher le quiz de session
       if (showSessionQuiz && activeSession?.quiz) {
         const quizData = activeSession.quiz as Record<string, unknown>;
         const quizContent = quizData.content as Record<string, unknown> | undefined;
         if (quizContent && quizContent.questions) {
-          return { 
-            content: quizContent, 
-            type: 'quiz' as string 
-          };
+          return { content: quizContent, type: 'quiz' as string };
         }
       }
-      
-      // Si le contenu de la session contient des questions (quiz), afficher comme quiz
+
       if (activeSession?.content && (activeSession.content as Record<string, unknown>).questions) {
-        return { 
-          content: activeSession.content, 
-          type: 'quiz' as string 
-        };
+        return { content: activeSession.content, type: 'quiz' as string };
       }
-      
+
       if (!activeSession?.chapitres || activeSession.chapitres.length === 0) {
         return { content: activeSession?.content, type: activeSession?.type };
       }
+
       const currentProgress = sessionProgress[activeSession.id];
       const chapterIndex = currentProgress?.currentChapterIndex ?? 0;
       const currentChapter = activeSession.chapitres[chapterIndex];
@@ -933,11 +867,9 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
       }
       return { content: activeSession.content, type: activeSession.type };
     };
-    
+
     const { content: currentContent, type: currentType } = getCurrentChapterInfo();
-    
-    // Debug: voir si le quiz est présent
-    
+
     if (!activeSession) return null;
     if (activeSession.locked)
       return (
@@ -947,6 +879,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
           <p className="text-sm text-gray-400 mt-1">Terminez les sessions précédentes pour débloquer.</p>
         </div>
       );
+
     switch (currentType) {
       case "article": return <ArticleContent content={currentContent as { body: string; breadcrumb?: string[] }} title={activeSession.title} onContentViewed={() => setChapterContentViewed(true)} />;
       case "video": return <VideoContent content={currentContent as { videoUrl: string; description: string }} title={activeSession.title} onContentViewed={() => setChapterContentViewed(true)} />;
@@ -957,119 +890,170 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
   };
 
   return (
-    <div className="flex h-full bg-gray-50 overflow-hidden " style={{ marginTop: '70px' }}>
+    <div className="flex h-full bg-gray-50 overflow-hidden" style={{ marginTop: '70px' }}>
 
-        {/* ── COLONNE 2 : Contenu principal ── */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-6 lg:p-18 w-full">
+      {/* ── Contenu principal ── */}
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-6 lg:p-18 w-full">
 
-            {/* Bouton Retour */}
-            <div className="mb-4">
-              <button 
-                onClick={onBack}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                <ChevronLeft size={16} />
-                Retour aux formations
-              </button>
-            </div>
-
-            {/* Breadcrumb */}
-            {activeSession?.type === "article" && (activeSession.content ).breadcrumb && (
-              <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-5 bg-white border border-gray-100 rounded-xl px-4 py-2.5 shadow-sm">
-                {(activeSession.content ).breadcrumb.map((crumb: string, i: number, arr: string[]) => (
-                  <span key={i} className="flex items-center gap-1.5">
-                    <span className={i === arr.length - 1 ? "text-gray-700 font-semibold" : "hover:text-gray-600 cursor-pointer"}>{crumb}</span>
-                    {i < arr.length - 1 && <ChevronRight size={12} className="text-gray-300" />}
-                  </span>
-                ))}
-              </nav>
-            )}
-
-            {renderSessionContent()}
-
-            {/* Navigation prev/next */}
-            <div className="flex items-center justify-between mt-10 pt-6 border-t border-gray-100">
-              <button onClick={() => activeIndex > 0 && setActiveSessionId(formation.sessions[activeIndex - 1].id)} disabled={activeIndex === 0}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                <ChevronLeft size={16} /> Précédent
-              </button>
-              <span className="text-xs text-gray-400">{activeIndex + 1} / {formation.sessions.length}</span>
-              <button 
-                onClick={handleNextChapter} 
-                disabled={!chapterContentViewed || (activeIndex === formation.sessions.length - 1 && !activeSession?.quiz && (!activeSession?.chapitres || activeSession.chapitres.length === 0))}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-500 rounded-xl hover:bg-teal-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title={!chapterContentViewed ? "Vous devez d'abord lire le contenu du chapitre" : ""}
-              >
-                {!chapterContentViewed ? "Étudier d'abord" : "Suivant"} <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        </main>
-
-        {/* ── COLONNE 3 : Sidebar sessions du cours (à droite du contenu) ── */}
-        <aside className="w-1/5 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-y-auto  md:flex">
-
-          {/* Titre */}
-          <div className="p-4 border-b border-gray-100 bg-gray-50 ">
-            <h2 className="font-semibold text-gray-800 text-sm leading-snug w-full">{formation.title}</h2>
+          {/* Bouton Retour */}
+          <div className="mb-4">
+            <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+              <ChevronLeft size={16} />
+              Retour aux formations
+            </button>
           </div>
 
-          {/* Carte professeur */}
-          <div className="p-4 border-b border-gray-100">
-            <div className="flex items-start gap-3">
-              <img src={formation.professor.avatar} alt="" className="w-11 h-11 rounded-full object-cover border-2 border-teal-100 shrink-0" />
-              <div className="min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-gray-900 text-sm truncate">{formation.professor.name}</span>
-                  {formation.professor.verified && <CheckCircle size={13} className="text-teal-500 shrink-0" />}
-                </div>
-                <p className="text-xs text-gray-400">{formation.professor.role}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Spécialité: {formation.professor.specialty}</p>
+          {/* Breadcrumb */}
+          {activeSession?.type === "article" && (activeSession.content as { breadcrumb?: string[] }).breadcrumb && (
+            <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-5 bg-white border border-gray-100 rounded-xl px-4 py-2.5 shadow-sm">
+              {(activeSession.content as { breadcrumb: string[] }).breadcrumb.map((crumb: string, i: number, arr: string[]) => (
+                <span key={i} className="flex items-center gap-1.5">
+                  <span className={i === arr.length - 1 ? "text-gray-700 font-semibold" : "hover:text-gray-600 cursor-pointer"}>{crumb}</span>
+                  {i < arr.length - 1 && <ChevronRight size={12} className="text-gray-300" />}
+                </span>
+              ))}
+            </nav>
+          )}
+
+          {renderSessionContent()}
+
+          {/* Navigation prev/next */}
+          <div className="flex items-center justify-between mt-10 pt-6 border-t border-gray-100">
+            <button
+              onClick={() => activeIndex > 0 && setActiveSessionId(formation.sessions[activeIndex - 1].id)}
+              disabled={activeIndex === 0}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} /> Précédent
+            </button>
+            <span className="text-xs text-gray-400">{activeIndex + 1} / {formation.sessions.length}</span>
+            <button
+              onClick={handleNextChapter}
+              disabled={
+                showSessionQuiz
+                || (!chapterContentViewed && !showSessionQuiz)
+                || (activeIndex === formation.sessions.length - 1 && !activeSession?.quiz && (!activeSession?.chapitres || activeSession.chapitres.length === 0))
+              }
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-500 rounded-xl hover:bg-teal-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title={!chapterContentViewed && !showSessionQuiz ? "Vous devez d'abord lire le contenu du chapitre" : ""}
+            >
+              {!chapterContentViewed && !showSessionQuiz ? "Étudier d'abord" : "Suivant"} <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </main>
+
+      {/* ── Sidebar sessions ── */}
+      <aside className="w-1/5 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-y-auto md:flex">
+
+        <div className="p-4 border-b border-gray-100 bg-gray-50">
+          <h2 className="font-semibold text-gray-800 text-sm leading-snug w-full">{formation.title}</h2>
+        </div>
+
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-start gap-3">
+            <img src={formation.professor.avatar} alt="" className="w-11 h-11 rounded-full object-cover border-2 border-teal-100 shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-gray-900 text-sm truncate">{formation.professor.name}</span>
+                {formation.professor.verified && <CheckCircle size={13} className="text-teal-500 shrink-0" />}
               </div>
-            </div>
-            <div className="mt-4">
-              <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-                <span>Progression</span>
-                <span className="font-semibold text-teal-600">{formation.progress}% Completed</span>
-              </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-teal-500 rounded-full transition-all duration-500" style={{ width: `${formation.progress}%` }} />
-              </div>
+              <p className="text-xs text-gray-400">{formation.professor.role}</p>
+              <p className="text-xs text-gray-500 mt-0.5">Spécialité: {formation.professor.specialty}</p>
             </div>
           </div>
+          <div className="mt-4">
+            <div className="flex justify-between text-xs text-gray-400 mb-1.5">
+              <span>Progression</span>
+              <span className="font-semibold text-teal-600">{formation.progress}% Completed</span>
+            </div>
+            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-teal-500 rounded-full transition-all duration-500" style={{ width: `${formation.progress}%` }} />
+            </div>
+          </div>
+        </div>
 
-          {/* Liste des sessions */}
-          <div className="p-3 flex-1 overflow-y-auto">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-1">Sessions de la formation</p>
-            <div className="space-y-1.5">
-              {formation.sessions.map((session: { id: number; title: string; type: string; duration: string; completed: boolean; locked: boolean }) => (
-                <button key={session.id} onClick={() => !session.locked && setActiveSessionId(session.id)}
+        <div className="p-3 flex-1 overflow-y-auto">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-1">Sessions de la formation</p>
+          <div className="space-y-1.5">
+            {/* ✅ CORRECTION : utilisation de isSessionAccessible(index) au lieu de session.locked */}
+            {formation.sessions.map((session: { id: number; title: string; type: string; duration: string; completed: boolean; locked: boolean }, index: number) => {
+              const accessible = isSessionAccessible(index);
+              return (
+                <button
+                  key={session.id}
+                  onClick={() => accessible && setActiveSessionId(session.id)}
                   className={`w-full text-left px-3 py-3 rounded-xl transition-all ${
-                    activeSessionId === session.id ? "bg-teal-50 border border-teal-200" :
-                    session.locked ? "opacity-50 cursor-not-allowed border border-transparent" :
-                    "hover:bg-gray-50 border border-transparent"
-                  }`}>
+                    activeSessionId === session.id
+                      ? "bg-teal-50 border border-teal-200"
+                      : !accessible
+                      ? "opacity-50 cursor-not-allowed border border-transparent"
+                      : "hover:bg-gray-50 border border-transparent"
+                  }`}
+                >
                   <div className="flex items-start gap-2.5">
                     <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${typeBadge(session.type)} border`}>
                       <SessionIcon type={session.type} size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-medium leading-snug ${activeSessionId === session.id ? "text-teal-700" : "text-gray-700"}`}>{session.title}</p>
+                      <p className={`text-xs font-medium leading-snug ${activeSessionId === session.id ? "text-teal-700" : "text-gray-700"}`}>
+                        {session.title}
+                      </p>
                       <div className="flex items-center gap-1.5 mt-1">
                         <Clock size={10} className="text-gray-300" />
                         <span className="text-[10px] text-gray-400">{session.duration}</span>
                       </div>
                     </div>
-                    <div className="shrink-0 mt-0.5">
-                      {session.locked ? <Lock size={12} className="text-gray-300" /> : session.completed ? <CheckCircle size={13} className="text-teal-500" /> : null}
+                   <div className="shrink-0 mt-0.5">
+                      {/* 👉 PRIORITE ABSOLUE A LA VALIDATION */}
+                      {session.completed ? (
+                        <CheckCircle size={13} className="text-teal-500" />
+                      ) : !accessible ? (
+                        <Lock size={12} className="text-gray-300" />
+                      ) : null}
                     </div>
+
                   </div>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
-        </aside>
-      </div>
+        </div>
+      </aside>
+
+      {/* Popup moderne avertissement moyenne insuffisante */}
+      {showAverageWarning && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in fade-in zoom-in duration-300">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                <Trophy size={24} className="text-orange-500" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg">Quiz final indisponible</h3>
+                <p className="text-sm text-gray-500">Progression insuffisante</p>
+              </div>
+            </div>
+            
+            <div className="mb-6 p-4 bg-orange-50 border border-orange-100 rounded-xl">
+              <p className="text-gray-700 text-sm leading-relaxed">
+                Votre moyenne actuelle est de <span className="font-bold text-orange-600">{calculateQuizAverage().average}%</span>.
+              </p>
+              <p className="text-gray-600 text-sm mt-2">
+                Vous devez avoir une moyenne <strong>supérieure ou égale à 60%</strong> et avoir réussi tous les quiz des sessions pour débloquer l'examen final.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowAverageWarning(false)}
+              className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-colors"
+            >
+              Compris, je continue ma formation
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

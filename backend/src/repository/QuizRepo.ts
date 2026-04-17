@@ -54,6 +54,21 @@ export class QuizRepo implements IRepository<Quiz> {
         });
     }
 
+    // ✅ Trouver le quiz final d'une formation
+    async findFinalQuizByFormation(formationId: number): Promise<any | null> {
+        return await this.prisma.quiz.findFirst({
+            where: {
+                formationId,
+                type: 'FINAL'
+            },
+            include: {
+                questions: {
+                    include: { reponses: true }
+                }
+            }
+        });
+    }
+
     // Mettre à jour le score d'un quiz
     async updateScore(id: number, score: number): Promise<Quiz> {
         return await this.prisma.quiz.update({

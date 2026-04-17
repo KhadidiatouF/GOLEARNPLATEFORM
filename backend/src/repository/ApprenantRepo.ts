@@ -34,7 +34,6 @@ export class ApprenantRepo implements IRepository <Apprenant>{
                     }
                 },
                 certifications: true,
-                paiements: true
             }
         });
     }

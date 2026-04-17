@@ -23,23 +23,22 @@ model Utilisateur {
 }
 
 model Professeur {
-  id            Int         @id @default(autoincrement())
-  specialite    String?     // Ajouté pour le seed
-  bio           String?     // Ajouté pour le seed
-  utilisateurId Int         @unique
+  id            Int              @id @default(autoincrement())
+  specialite    String? // Ajouté pour le seed
+  bio           String? // Ajouté pour le seed
+  utilisateurId Int              @unique
   formations    Formation[]
-  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id])
+  utilisateur   Utilisateur      @relation(fields: [utilisateurId], references: [id])
   statut        StatutProfesseur @default(EN_ATTENTE)
 }
 
 model Apprenant {
   id             Int                  @id @default(autoincrement())
-  niveau         String?              // Ajouté pour le seed
+  niveau         String? // Ajouté pour le seed
   utilisateurId  Int                  @unique
   utilisateur    Utilisateur          @relation(fields: [utilisateurId], references: [id])
   formations     ApprenantFormation[]
   certifications Certification[]
-  paiements      Paiement[]
 }
 
 model Administrateur {
@@ -64,48 +63,53 @@ model Formation {
   professeur     Professeur           @relation(fields: [professeurId], references: [id])
   quiz           Quiz[]
   sessions       Session[]
-  statut         StatutFormation     @default(EN_ATTENTE)
+  statut         StatutFormation      @default(EN_ATTENTE)
 
   @@index([professeurId], map: "Formation_professeurId_fkey")
 }
 
 model Session {
-  id          Int         @id @default(autoincrement())
+  id          Int        @id @default(autoincrement())
   titre       String
   contenu     String?
   duree       String
   chapitres   Chapitre[]
   quiz        Quiz?
   formationId Int
-  formation   Formation   @relation(fields: [formationId], references: [id])
+  formation   Formation  @relation(fields: [formationId], references: [id])
 
   @@index([formationId], map: "Session_formationId_fkey")
 }
+
 model Chapitre {
-  id          Int        @id @default(autoincrement())
-  titre       String
-  contenu     String     @db.Text
-  duree       String
-  typeContenu TypeContenu
-  ordre       Int        @default(0)
-  videoUrl    String?    // URL video (YouTube, Vimeo, etc.)
-  pdfUrl      String?    // URL PDF
-  sessionId   Int
-  session     Session    @relation(fields: [sessionId], references: [id])
+  id           Int                 @id @default(autoincrement())
+  titre        String
+  contenu      String              @db.Text
+  duree        String
+  typeContenu  TypeContenu
+  ordre        Int                 @default(0)
+  videoUrl     String? // URL video (YouTube, Vimeo, etc.)
+  pdfUrl       String? // URL PDF
+  sessionId    Int
+  session      Session             @relation(fields: [sessionId], references: [id])
   progressions ApprenantChapitre[]
 
   @@index([sessionId], map: "Chapitre_sessionId_fkey")
 }
 
 model Paiement {
-  id            Int           @id @default(autoincrement())
-  montant       Float
-  moyenPaiement MoyenPaiement
-  datePaiement  DateTime      @default(now())
-  apprenantId   Int
-  apprenant     Apprenant     @relation(fields: [apprenantId], references: [id])
+  id                   Int                @id @default(autoincrement())
+  montant              Float
+  moyenPaiement        MoyenPaiement
+  datePaiement         DateTime           @default(now())
+  statut               StatutPaiement     @default(EN_ATTENTE)
+  transactionId        String?            @unique
+  reference            String?            @unique
+  callbackData         Json?
+  apprenantFormationId Int
+  apprenantFormation   ApprenantFormation @relation(fields: [apprenantFormationId], references: [id])
 
-  @@index([apprenantId], map: "Paiement_apprenantId_fkey")
+  @@index([apprenantFormationId], map: "Paiement_apprenantFormationId_fkey")
 }
 
 model Certification {
@@ -121,32 +125,33 @@ model Certification {
 }
 
 model ApprenantFormation {
-  id          Int       @id @default(autoincrement())
+  id          Int          @id @default(autoincrement())
   apprenantId Int
   formationId Int
   progression Progression?
-  apprenant   Apprenant @relation(fields: [apprenantId], references: [id])
-  formation   Formation @relation(fields: [formationId], references: [id])
+  apprenant   Apprenant    @relation(fields: [apprenantId], references: [id])
+  formation   Formation    @relation(fields: [formationId], references: [id])
+  paiements   Paiement[]
 
   @@unique([apprenantId, formationId])
 }
 
 model Progression {
-  id                   Int                  @id @default(autoincrement())
-  apprenantFormationId Int                  @unique
+  id                   Int                 @id @default(autoincrement())
+  apprenantFormationId Int                 @unique
   chapitresCompletes   ApprenantChapitre[]
-  dateDerniereActivite DateTime             @default(now())
-  apprenantFormation   ApprenantFormation   @relation(fields: [apprenantFormationId], references: [id])
+  dateDerniereActivite DateTime            @default(now())
+  apprenantFormation   ApprenantFormation  @relation(fields: [apprenantFormationId], references: [id])
 }
 
 model ApprenantChapitre {
-  id          Int       @id @default(autoincrement())
-  estComplete Boolean   @default(false)
+  id             Int         @id @default(autoincrement())
+  estComplete    Boolean     @default(false)
   dateCompletion DateTime?
-  progressionId Int
-  chapitreId   Int
-  progression  Progression @relation(fields: [progressionId], references: [id])
-  chapitre     Chapitre  @relation(fields: [chapitreId], references: [id])
+  progressionId  Int
+  chapitreId     Int
+  progression    Progression @relation(fields: [progressionId], references: [id])
+  chapitre       Chapitre    @relation(fields: [chapitreId], references: [id])
 
   @@unique([progressionId, chapitreId])
 }
@@ -155,10 +160,11 @@ model Quiz {
   id          Int        @id @default(autoincrement())
   score       Float?
   formationId Int
-  sessionId   Int        @unique
+  sessionId   Int?        @unique
+  type        TypeQuiz   @default(SESSION)
   questions   Question[]
   formation   Formation  @relation(fields: [formationId], references: [id])
-  session     Session    @relation(fields: [sessionId], references: [id])
+  session     Session?    @relation(fields: [sessionId], references: [id])
 }
 
 model Question {
@@ -210,4 +216,16 @@ enum MoyenPaiement {
 enum TypeCours {
   PAYANT
   GRATUIT
+}
+
+enum TypeQuiz {
+  SESSION
+  FINAL
+}
+
+enum StatutPaiement {
+  EN_ATTENTE
+  VALIDE
+  ECHOUE
+  ANNULE
 }
