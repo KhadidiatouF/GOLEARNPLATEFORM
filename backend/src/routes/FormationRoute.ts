@@ -37,6 +37,20 @@ router.post("/:id/inscrire", authenticate, async (req, res) => {
         if (!apprenant) {
             return res.status(404).json({ error: "Apprenant non trouvé" });
         }
+
+        const formation = await prisma.formation.findUnique({
+            where: { id: formationId }
+        });
+
+        if (!formation) {
+            return res.status(404).json({ error: "Formation non trouvée" });
+        }
+
+        if (formation.typeCours !== 'GRATUIT' && formation.prix > 0) {
+            return res.status(403).json({
+                error: "Le déblocage d'une formation payante se fait uniquement après validation du paiement."
+            });
+        }
         
         // Vérifier si déjà inscrit
         const existing = await prisma.apprenantFormation.findFirst({

@@ -70,5 +70,26 @@ export const apiAuth = {
 
   getUserRole: () => {
     return localStorage.getItem('userRole');
+  },
+
+  resetPassword: async (token: string, newPassword: string) => {
+    try {
+      const response = await fetch(`${BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: data.message || 'Erreur lors de la mise à jour du mot de passe' };
+      }
+
+      return { success: true, data };
+    } catch (error) {
+      console.error('Erreur reset password:', error);
+      return { success: false, error: 'Impossible de contacter le serveur' };
+    }
   }
 };

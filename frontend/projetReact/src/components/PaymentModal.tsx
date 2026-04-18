@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { X, Smartphone, CreditCard, CheckCircle, AlertCircle, Loader } from 'lucide-react';
+import { apiPaiement } from '../api/apiPaiement';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  formationId: number;
   courseName: string;
   amount: number;
   onPaymentSuccess: (paymentMethod: string) => void;
@@ -11,12 +13,10 @@ interface PaymentModalProps {
 
 type PaymentMethod = 'wave' | 'orange_money' | 'card' | null;
 
-// ID de paiement fixe pour la démo
-const DEMO_PAYMENT_ID = 'PAY-2026-DEMO';
-
 const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
+  formationId,
   courseName,
   amount,
   onPaymentSuccess
@@ -35,40 +35,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setPaymentStatus('idle');
     setErrorMessage('');
 
-    // Simulation du paiement (2 secondes)
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const moyenPaiement =
+        selectedMethod === 'wave' ? 'WAVE' : selectedMethod === 'orange_money' ? 'OM' : 'CARTE_BANCAIRE';
 
-    // Simulation réussie pour la démo (80% de succès)
-    const isSuccess = true;
+      await apiPaiement.createPaiement({
+        formationId,
+        moyenPaiement
+      });
 
-    if (isSuccess) {
       setPaymentStatus('success');
-      
-      // Simuler l'enregistrement du paiement
-      const paymentRecord = {
-        id: DEMO_PAYMENT_ID,
-        amount: amount,
-        method: selectedMethod,
-        courseName: courseName
-      };
-      
-      console.log('Paiement enregistré:', paymentRecord);
-      
-      // Simuler le partage des revenus (70% enseignant, 30% plateforme)
-      const platformFee = Math.round(amount * 0.3);
-      const teacherRevenue = Math.round(amount * 0.7);
-      console.log(`Revenu partagé - Plateforme: ${platformFee} CFA, Enseignant: ${teacherRevenue} CFA`);
-      
       setTimeout(() => {
         onPaymentSuccess(selectedMethod);
         handleClose();
       }, 1500);
-    } else {
+    } catch (error) {
       setPaymentStatus('error');
-      setErrorMessage('La transaction a échoué. Veuillez réessayer ou utiliser un autre moyen de paiement.');
+      setErrorMessage(error instanceof Error ? error.message : 'La transaction a échoué. Veuillez réessayer ou utiliser un autre moyen de paiement.');
+    } finally {
+      setIsProcessing(false);
     }
-
-    setIsProcessing(false);
   };
 
   const handleClose = () => {
@@ -198,7 +184,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
               <h3 className="text-xl font-bold text-gray-800 mb-2">Paiement réussi !</h3>
               <p className="text-gray-600">
-                Votre inscription a été créée avec succès. Vous allez être redirigé vers votre tableau de bord.
+                Votre paiement a été validé et la formation est maintenant disponible dans votre espace apprenant.
               </p>
             </div>
           )}

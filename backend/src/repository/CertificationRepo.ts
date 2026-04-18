@@ -38,6 +38,12 @@ export class CertificationRepo implements IRepository<Certification> {
         });
     }
 
+    async findByApprenantAndFormation(apprenantId: number, formationId: number): Promise<Certification | null> {
+        return await this.prisma.certification.findFirst({
+            where: { apprenantId, formationId }
+        });
+    }
+
     async create(data: Omit<Certification, "id">): Promise<Certification> {
         return await this.prisma.certification.create({ data });
     }

@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { apiFormation } from '../api/apiFormation';
 import { apiProgression } from '../api/apiProgression';
 import { apiUsers } from '../api/apiUsers';
+import { apiProfesseur } from '../api/apiProfesseur';
 import { BookOpen, Users, Calendar, Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // Types pour la création complète de formation
@@ -72,6 +73,17 @@ interface Course {
   status: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
   color: string;
   professeurId: number;
+}
+
+interface RevenueHistoryItem {
+  id: number;
+  date: string;
+  formationTitre: string;
+  formationId: number;
+  montantTotal: number;
+  partProfesseur: number;
+  apprenantNom: string;
+  apprenantEmail: string;
 }
 
 // Interface pour les données de formation reçues de l'API
@@ -159,6 +171,8 @@ export default function ProfDashboard() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<number | null>(null);
   const [solde, setSolde] = useState<number>(0);
+  const [revenueHistory, setRevenueHistory] = useState<RevenueHistoryItem[]>([]);
+  const [revenueHistoryLoading, setRevenueHistoryLoading] = useState(true);
   const [newCourse, setNewCourse] = useState({
     titre: '',
     description: '',
@@ -443,6 +457,27 @@ export default function ProfDashboard() {
 
     fetchSolde();
   }, []);
+
+  useEffect(() => {
+    const fetchRevenueHistory = async () => {
+      try {
+        setRevenueHistoryLoading(true);
+        const response = await apiProfesseur.getHistoriqueRevenus();
+        setRevenueHistory(response?.data || []);
+      } catch (error) {
+        console.error("Erreur lors du chargement de l'historique des revenus:", error);
+        setRevenueHistory([]);
+      } finally {
+        setRevenueHistoryLoading(false);
+      }
+    };
+
+    if (user?.role === 'prof') {
+      fetchRevenueHistory();
+    } else {
+      setRevenueHistoryLoading(false);
+    }
+  }, [user?.role]);
 
 
   // ── Variables calculées pour les statistiques dynamiques du professeur ──
@@ -1346,8 +1381,39 @@ export default function ProfDashboard() {
               <div>
                 <h3 className="font-semibold text-gray-800 mb-4">Historique des revenus</h3>
                 <div className="space-y-3">
-                <p className="text-center text-gray-500 py-6">Historique des revenus bientôt disponible</p>
-                {/* TODO: Remplacer par les vrais paiements depuis l'API filtré par professeurId */}
+                  {revenueHistoryLoading ? (
+                    <p className="text-center text-gray-500 py-6">Chargement de l'historique des revenus...</p>
+                  ) : revenueHistory.length === 0 ? (
+                    <p className="text-center text-gray-500 py-6">Aucun achat validé pour vos formations pour le moment.</p>
+                  ) : (
+                    revenueHistory.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <p className="font-semibold text-gray-900">{item.formationTitre}</p>
+                            <p className="mt-1 text-sm text-gray-600">
+                              Acheté par <span className="font-medium text-gray-800">{item.apprenantNom}</span>
+                            </p>
+                            <p className="text-sm text-gray-500">{item.apprenantEmail}</p>
+                            <p className="mt-2 text-xs text-gray-400">
+                              {new Date(item.date).toLocaleDateString('fr-FR', {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          <div className="rounded-xl bg-purple-100 px-4 py-3 text-right">
+                            <p className="text-xs font-medium uppercase tracking-wide text-purple-700">Votre gain</p>
+                            <p className="text-xl font-bold text-purple-800">{item.partProfesseur.toLocaleString()} XOF</p>
+                            <p className="mt-1 text-xs text-purple-600">
+                              Vente totale : {item.montantTotal.toLocaleString()} XOF
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>

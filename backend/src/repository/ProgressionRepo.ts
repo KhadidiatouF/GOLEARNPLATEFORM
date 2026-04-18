@@ -17,6 +17,19 @@ export class ProgressionRepo {
         return await this.prisma.progression.findUnique({
             where: { apprenantFormationId },
             include: {
+                apprenantFormation: {
+                    include: {
+                        formation: {
+                            include: {
+                                sessions: {
+                                    include: {
+                                        chapitres: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 chapitresCompletes: {
                     include: { chapitre: true }
                 }

@@ -31,7 +31,23 @@ router.get("/by-user/:userId/formations", authenticate, async (req, res) => {
         
         // Récupérer les formations auxquelles l'apprenant est inscrit
         const inscriptions = await prisma.apprenantFormation.findMany({
-            where: { apprenantId },
+            where: {
+                apprenantId,
+                OR: [
+                    {
+                        formation: {
+                            typeCours: 'GRATUIT'
+                        }
+                    },
+                    {
+                        paiements: {
+                            some: {
+                                statut: 'VALIDE'
+                            }
+                        }
+                    }
+                ]
+            },
             include: {
                 formation: {
                     include: {
@@ -85,7 +101,23 @@ router.get("/:id/formations", authenticate, async (req, res) => {
         
         // Récupérer les formations auxquelles l'apprenant est inscrit
         const inscriptions = await prisma.apprenantFormation.findMany({
-            where: { apprenantId },
+            where: {
+                apprenantId,
+                OR: [
+                    {
+                        formation: {
+                            typeCours: 'GRATUIT'
+                        }
+                    },
+                    {
+                        paiements: {
+                            some: {
+                                statut: 'VALIDE'
+                            }
+                        }
+                    }
+                ]
+            },
             include: {
                 formation: {
                     include: {

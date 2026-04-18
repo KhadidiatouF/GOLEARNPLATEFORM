@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, Clock, BookOpen, Infinity as InfinityIcon, Award, CheckCircle, Loader, Star, GraduationCap, Video, CreditCard } from 'lucide-react';
 import Header from '../components/Header';
+import { apiPaiement } from '../api/apiPaiement';
 
 interface Formation {
   id: number;
@@ -85,42 +86,21 @@ const Paiement: React.FC = () => {
     setPaymentStatus('idle');
     setErrorMessage('');
 
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const moyenPaiement = selectedMethod === 'wave' ? 'WAVE' : 'OM';
+      await apiPaiement.createPaiement({
+        formationId: formation.id,
+        moyenPaiement,
+      });
 
-    const isSuccess = true;
-    if (isSuccess) {
       setPaymentStatus('success');
-      const paiement = {
-        id: `PAY-${Date.now()}`,
-        montant: formation.prix,
-        methode: selectedMethod,
-        coursId: formation.id,
-        utilisateurId: user.id,
-        datePaiement: new Date().toISOString(),
-      };
-      const paiements = JSON.parse(localStorage.getItem('paiements') || '[]');
-      paiements.push(paiement);
-      localStorage.setItem('paiements', JSON.stringify(paiements));
-
-      const inscription = {
-        id: `${formation.id}-${user.id}`,
-        coursId: formation.id,
-        utilisateurId: user.id,
-        dateInscription: new Date().toISOString(),
-        coursTitre: formation.titre,
-        paiement: selectedMethod,
-        montant: formation.prix,
-      };
-      const inscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
-      inscriptions.push(inscription);
-      localStorage.setItem('inscriptions', JSON.stringify(inscriptions));
-
       setTimeout(() => navigate('/apprenant'), 2000);
-    } else {
+    } catch (error) {
       setPaymentStatus('error');
-      setErrorMessage('La transaction a échoué. Veuillez réessayer.');
+      setErrorMessage(error instanceof Error ? error.message : 'La transaction a échoué. Veuillez réessayer.');
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
   const renderStars = (rating: number) => {
@@ -178,12 +158,12 @@ const Paiement: React.FC = () => {
               <CheckCircle className="w-10 h-10 text-purple-600" />
             </div>
             <h2 className="text-2xl font-semibold text-purple-700 mb-3">
-              {isFree ? 'Inscription confirmée !' : 'Paiement réussi !'}
+              {isFree ? 'Inscription confirmée !' : 'Paiement confirmé !'}
             </h2>
             <p className="text-gray-500 text-sm leading-relaxed mb-4">
               {isFree
                 ? `Vous avez accès au cours "${formation.titre}". Bonne formation !`
-                : `Votre inscription à "${formation.titre}" a été confirmée.`}
+                : `Votre paiement pour "${formation.titre}" a été validé. La formation est déjà ajoutée à votre espace apprenant.`}
             </p>
             <p className="text-gray-400 text-xs">Redirection vers votre espace apprenant...</p>
           </div>

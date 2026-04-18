@@ -21,7 +21,19 @@ interface CertificateData {
   formationId: number;
   dateObtention: string;
   formation?: {
-    titre: string;
+    titre?: string;
+    professorName?: string;
+    professor?: string | {
+      name?: string;
+    };
+    professeur?: string | {
+      nom?: string;
+      prenom?: string;
+      utilisateur?: {
+        nom?: string;
+        prenom?: string;
+      };
+    };
   };
 }
 
@@ -65,6 +77,37 @@ const menuItems: MenuItem[] = [
 ];
 
 // Les certifications seront chargées depuis localStorage
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function extractProfessorName(source: unknown): string {
+  if (!source) return '';
+  if (typeof source === 'string') return source.trim();
+  if (typeof source !== 'object') return '';
+
+  const data = source as Record<string, unknown>;
+  const directName =
+    readString(data.professorName) ||
+    readString(data.name) ||
+    readString(data.professor);
+
+  if (directName) return directName;
+
+  const nestedProfessor = extractProfessorName(data.professeur);
+  if (nestedProfessor) return nestedProfessor;
+
+  const nestedUser = data.utilisateur as Record<string, unknown> | undefined;
+  if (nestedUser) {
+    const fullName = `${readString(nestedUser.prenom)} ${readString(nestedUser.nom)}`.trim();
+    if (fullName) return fullName;
+    const userName = readString(nestedUser.name);
+    if (userName) return userName;
+  }
+
+  return `${readString(data.prenom)} ${readString(data.nom)}`.trim();
+}
 
 export default function ApprenantDashboard() {
   const { user, logout } = useAuth();
@@ -118,27 +161,27 @@ export default function ApprenantDashboard() {
   // État pour les certifications depuis l'API
   const [certifications, setCertifications] = useState<CertificateData[]>([]);
   const [certificationsLoading, setCertificationsLoading] = useState(true);
+
+  const loadCertifications = async () => {
+    try {
+      setCertificationsLoading(true);
+      const response = await apiCertif.getCertifications();
+      if (response && response.data && response.data.data) {
+        setCertifications(response.data.data);
+        setCertificationsLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.error('Erreur chargement certifications:', error);
+    }
+
+    const storedCerts = JSON.parse(localStorage.getItem('certifications') || '[]');
+    setCertifications(storedCerts);
+    setCertificationsLoading(false);
+  };
   
   // Charger les certifications depuis l'API
   useEffect(() => {
-    const loadCertifications = async () => {
-      try {
-        setCertificationsLoading(true);
-        const response = await apiCertif.getCertifications();
-        // ✅ CORRECTION: le backend renvoie { data: { data: [...] } }
-        if (response && response.data && response.data.data) {
-          setCertifications(response.data.data);
-        }
-      } catch (error) {
-        console.error('Erreur chargement certifications:', error);
-        // Fallback vers localStorage
-        const storedCerts = JSON.parse(localStorage.getItem('certifications') || '[]');
-        setCertifications(storedCerts);
-      } finally {
-        setCertificationsLoading(false);
-      }
-    };
-    
     loadCertifications();
   }, []);
 
@@ -170,6 +213,22 @@ export default function ApprenantDashboard() {
   const handleCloseCertificate = () => {
     setSelectedCertificate(null);
     setAutoDownload(false);
+  };
+
+  const getCertificateProfessorName = (cert: CertificateData | null): string => {
+    if (!cert) return '';
+
+    const professorFromCertificate = extractProfessorName(cert.formation);
+    if (professorFromCertificate) return professorFromCertificate;
+
+    const courseTitle = cert.formation?.titre?.trim().toLowerCase();
+    if (!courseTitle) return '';
+
+    const matchingFormation = enrolledFormations.find(
+      (formation) => formation.title.trim().toLowerCase() === courseTitle
+    );
+
+    return matchingFormation?.professor || '';
   };
 
   // ── Ouvrir une formation : on bascule aussi sur l'onglet formations ──
@@ -242,7 +301,7 @@ export default function ApprenantDashboard() {
                 ) : (
                   // Afficher seulement les 2 dernières formations consultées
                   enrolledFormations.slice(-2).map((course, idx) => {
-                    const gradient = course.typeCours === 'GRATUIT' ? 'from-blue-500 to-blue-700' : 'from-green-500 to-green-700';
+                    const colorClass = course.typeCours === 'GRATUIT' ? 'text-purple-600' : 'text-green-600';
                     return (
                     <div key={idx} className="bg-white rounded-xl shadow-lg p-4">
                       <div className="flex items-start justify-between mb-3">
@@ -252,8 +311,8 @@ export default function ApprenantDashboard() {
                             {course.price === 0 ? 'Gratuit' : `${course.price} CFA`}
                           </span>
                         </div>
-                        <div className={`p-2 bg-gradient-to-r ${gradient} rounded-full`}>
-                          <PlayCircle className="w-4 h-4 text-white" />
+                        <div className="p-2 bg-purple-100 rounded-full">
+                          <PlayCircle className={`w-4 h-4 ${colorClass}`} />
                         </div>
                       </div>
                       <div className="mb-3">
@@ -262,7 +321,7 @@ export default function ApprenantDashboard() {
                           <span className="font-medium text-gray-800">{course.progress}%</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div className={`bg-gradient-to-r ${gradient} h-2 rounded-full`} style={{ width: `${course.progress}%` }} />
+                          <div className={`bg-purple-400 h-2 rounded-full`} style={{ width: `${course.progress}%` }} />
                         </div>
                       </div>
                       <div className="flex gap-4 text-xs text-gray-600">
@@ -271,7 +330,7 @@ export default function ApprenantDashboard() {
                       </div>
                       <button
                         onClick={() => openFormation(course.id)}
-                        className={`w-full mt-3 py-1.5 text-sm bg-gradient-to-r ${gradient} text-white rounded-lg font-medium hover:opacity-90 transition`}
+                        className={`w-full mt-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg font-medium hover:opacity-90 transition`}
                       >
                         Continuer
                       </button>
@@ -578,6 +637,14 @@ export default function ApprenantDashboard() {
             <CourseViewer
               onBack={() => setSelectedFormation(null)}
               formationId={selectedFormation}
+              onCertificationEarned={() => {
+                loadCertifications();
+              }}
+              onOpenCertificates={() => {
+                loadCertifications();
+                setSelectedFormation(null);
+                setActiveTab('certificats');
+              }}
             />
           </div>
         ) : (
@@ -592,6 +659,7 @@ export default function ApprenantDashboard() {
           courseName={selectedCertificate?.formation?.titre || ''}
           completionDate={selectedCertificate?.dateObtention ? new Date(selectedCertificate.dateObtention).toLocaleDateString('fr-FR') : ''}
           instructor="Golearn"
+          courseInstructorName={getCertificateProfessorName(selectedCertificate)}
           onClose={handleCloseCertificate}
           autoDownload={autoDownload}
         />

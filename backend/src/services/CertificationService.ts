@@ -23,6 +23,15 @@ export class CertificationService {
         return this.certificationRepo.create(data);
     }
 
+    async createCertificationIfMissing(apprenantId: number, formationId: number) {
+        const existingCertification = await this.certificationRepo.findByApprenantAndFormation(apprenantId, formationId);
+        if (existingCertification) {
+            return existingCertification;
+        }
+
+        return this.certificationRepo.create({ apprenantId, formationId, dateObtention: new Date() });
+    }
+
     updateCertification(id: number, data: any) {
         return this.certificationRepo.update(id, data);
     }

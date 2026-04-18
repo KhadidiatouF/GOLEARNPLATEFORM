@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { apiQuiz } from '../api/apiQuiz';
+import { apiCertif } from '../api/apiCertif';
 import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -11,7 +12,10 @@ interface QuizQuestion { id: number; question: string; options: string[]; correc
 interface QuizContentProps { content: { questions: QuizQuestion[] }; onSuccess?: () => void; }
 
 interface FinalQuizResponse {
-  questions: QuizQuestion[];
+  data?: {
+    questions?: Record<string, unknown>[];
+  };
+  questions?: Record<string, unknown>[];
 }
 
 interface SessionProgress {
@@ -27,6 +31,8 @@ interface FinalQuizState {
   score: number | null;
   average: number;
   allPassed: boolean;
+  certificationIssued?: boolean;
+  certificationError?: string | null;
 }
 
 interface ChapitreContent {
@@ -82,6 +88,73 @@ interface FormationData {
   };
 }
 
+function isAnswerMarkedCorrect(value: unknown): boolean {
+  return value === true || value === 1 || value === "1" || value === "true";
+}
+
+function getCorrectAnswerIndex(reponses: unknown[]): number {
+  const correctIndex = reponses.findIndex((r: unknown) => {
+    const reponse = r as Record<string, unknown>;
+    return isAnswerMarkedCorrect(reponse.estCorrecte);
+  });
+
+  return correctIndex >= 0 ? correctIndex : 0;
+}
+
+function normalizeQuizQuestions(rawQuestions: unknown[] = []): QuizQuestion[] {
+  return rawQuestions.map((q: unknown, idx: number) => {
+    const question = q as Record<string, unknown>;
+    const reponses = (question.reponses as Record<string, unknown>[]) || [];
+    return {
+      id: Number(question.id) || (idx + 1),
+      question: String(question.question || question.contenu || ''),
+      options: (question.options as string[]) || reponses.map((r: Record<string, unknown>) => String(r.contenu || '')),
+      correct: Number(question.correct) >= 0
+        ? Number(question.correct)
+        : getCorrectAnswerIndex(reponses)
+    };
+  });
+}
+
+function buildQuizResultsStorageKey(userId: number | undefined, formationId: number): string {
+  return `quiz-results:${userId || "anonymous"}:${formationId}`;
+}
+
+function computeFormationProgress(
+  sessions: Session[],
+  progress: Record<number, SessionProgress>
+): number {
+  const totalChapters = sessions.reduce((sum, session) => sum + (session.chapitres?.length || 0), 0);
+  const totalQuizSessions = sessions.filter((session) => !!session.quiz).length;
+  const totalSteps = totalChapters + totalQuizSessions;
+
+  if (totalSteps === 0) {
+    return 0;
+  }
+
+  const completedChapters = sessions.reduce((sum, session) => {
+    const sessionState = progress[session.id];
+    const completedCount = sessionState?.chaptersCompleted?.filter(Boolean).length || 0;
+    return sum + completedCount;
+  }, 0);
+
+  const passedQuizCount = sessions.reduce((sum, session) => {
+    if (!session.quiz) return sum;
+    return sum + (progress[session.id]?.quizPassed ? 1 : 0);
+  }, 0);
+
+  return Math.round(((completedChapters + passedQuizCount) / totalSteps) * 100);
+}
+
+function isSessionFullyCompleted(session: Session, progress: SessionProgress | undefined): boolean {
+  const totalChapters = session.chapitres?.length || 0;
+  const completedChapters = progress?.chaptersCompleted?.filter(Boolean).length || 0;
+  const chaptersDone = totalChapters === 0 || completedChapters >= totalChapters;
+  const quizDone = !session.quiz || !!progress?.quizPassed;
+
+  return chaptersDone && quizDone;
+}
+
 const mockFormation = {
   id: 1,
   title: "Développement Web Complet",
@@ -135,8 +208,8 @@ CSS Grid est un système de mise en page bidimensionnel puissant.
 
 function SessionIcon({ type, size = 20 }: { type: string; size?: number }) {
   const props = { size, strokeWidth: 1.8 };
-  if (type === "video") return <Video {...props} className="text-blue-500" />;
-  if (type === "article") return <FileText {...props} className="text-teal-500" />;
+  if (type === "video") return <Video {...props} className="text-purple-500" />;
+  if (type === "article") return <FileText {...props} className="text-purple-500" />;
   if (type === "quiz") return <ClipboardList {...props} className="text-orange-500" />;
   if (type === "pdf") return <BookOpen {...props} className="text-red-400" />;
   return <FileText {...props} />;
@@ -144,8 +217,8 @@ function SessionIcon({ type, size = 20 }: { type: string; size?: number }) {
 
 function typeBadge(type: string): string {
   const map: Record<string, string> = {
-    video: "bg-blue-50 text-blue-600 border-blue-100",
-    article: "bg-teal-50 text-teal-600 border-teal-100",
+    video: "bg-purple-50 text-purple-600 border-purple-100",
+    article: "bg-purple-50 text-purple-600 border-purple-100",
     quiz: "bg-orange-50 text-orange-600 border-orange-100",
     pdf: "bg-red-50 text-red-500 border-red-100",
   };
@@ -297,7 +370,7 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
             <p className="text-3xl font-bold text-gray-900">{score}/{totalQuestions}</p>
             <p className="text-gray-500 mt-1">bonnes réponses</p>
           </div>
-          <button onClick={handleContinue} className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${passed ? 'bg-teal-500 hover:bg-teal-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
+          <button onClick={handleContinue} className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${passed ? 'bg-purple-500 hover:bg-purple-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
             {passed ? 'Passer à la session suivante' : 'Réessayer le quiz'}
           </button>
         </div>
@@ -329,21 +402,40 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
 interface QuizWrapperProps {
   content: { questions: QuizQuestion[] };
   onSubmit: (score: number) => void;
-  onSuccess?: () => void;
+  onSuccess?: (score: number) => void;
   requiredScore?: number;
+  variant?: "session" | "final";
 }
 
-function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60 }: QuizWrapperProps) {
+function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60, variant = "session" }: QuizWrapperProps) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
-  const correctCount = submitted ? content.questions.filter((q) => answers[q.id] === q.correct).length : 0;
+  const computedCorrectCount = content.questions.filter((q) => answers[q.id] === q.correct).length;
+  const correctCount = submitted ? computedCorrectCount : 0;
   const totalQuestions = content.questions.length;
   const percentage = Math.round((correctCount / totalQuestions) * 100);
   const passed = percentage >= requiredScore;
+  const isFinalQuiz = variant === "final";
+  const accentClasses = isFinalQuiz
+    ? {
+        selected: "border-purple-400 bg-purple-50 text-purple-700 font-medium",
+        idle: "border-gray-200 text-gray-600 hover:border-purple-200 hover:bg-purple-50/60",
+        submit: "bg-purple-600 hover:bg-purple-700",
+        successButton: "bg-purple-600 hover:bg-purple-700",
+        retryButton: "bg-purple-500 hover:bg-purple-600"
+      }
+    : {
+        selected: "border-orange-400 bg-orange-50 text-orange-700 font-medium",
+        idle: "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50",
+        submit: "bg-orange-500 hover:bg-orange-600",
+        successButton: "bg-purple-500 hover:bg-purple-600",
+        retryButton: "bg-orange-500 hover:bg-orange-600"
+      };
 
   const handleSubmit = () => {
+    const nextPercentage = Math.round((computedCorrectCount / totalQuestions) * 100);
     setSubmitted(true);
-    onSubmit(percentage);
+    onSubmit(nextPercentage);
   };
 
   if (submitted) {
@@ -375,15 +467,15 @@ function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60 }: QuizW
 
         {passed ? (
           <button
-            onClick={() => { if (onSuccess) onSuccess(); }}
-            className="w-full py-3 bg-teal-500 text-white rounded-xl font-semibold hover:bg-teal-600 transition-colors shadow-sm"
+            onClick={() => { if (onSuccess) onSuccess(percentage); }}
+            className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${accentClasses.successButton}`}
           >
-            Passer à la session suivante
+            {isFinalQuiz ? "Voir mes certificats" : "Passer à la session suivante"}
           </button>
         ) : (
           <button
             onClick={() => { setAnswers({}); setSubmitted(false); }}
-            className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors shadow-sm"
+            className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${accentClasses.retryButton}`}
           >
             Réessayer le quiz
           </button>
@@ -400,7 +492,7 @@ function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60 }: QuizW
           <div className="space-y-2">
             {q.options.map((opt: string, idx: number) => (
               <button key={idx} onClick={() => setAnswers((a) => ({ ...a, [q.id]: idx }))}
-                className={`w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-all ${answers[q.id] === idx ? "border-orange-400 bg-orange-50 text-orange-700 font-medium" : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"}`}>
+                className={`w-full text-left px-4 py-2.5 rounded-lg border text-sm transition-all ${answers[q.id] === idx ? accentClasses.selected : accentClasses.idle}`}>
                 <span className="mr-2 font-semibold text-gray-400">{String.fromCharCode(65 + idx)}.</span>{opt}
               </button>
             ))}
@@ -408,17 +500,24 @@ function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60 }: QuizW
         </div>
       ))}
       <button onClick={handleSubmit} disabled={Object.keys(answers).length < totalQuestions}
-        className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
+        className={`w-full py-3 text-white rounded-xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm ${accentClasses.submit}`}>
         Soumettre ({requiredScore}% requis)
       </button>
     </div>
   );
 }
 
-interface CourseViewerProps { onBack: () => void; formationId?: number; }
+interface CourseViewerProps {
+  onBack: () => void;
+  formationId?: number;
+  onCertificationEarned?: () => void;
+  onOpenCertificates?: () => void;
+}
 
-export default function CourseViewer({ onBack, formationId }: CourseViewerProps) {
+export default function CourseViewer({ onBack, formationId, onCertificationEarned, onOpenCertificates }: CourseViewerProps) {
   const location = useLocation();
+  const storedUser = localStorage.getItem("user");
+  const currentUser = storedUser ? JSON.parse(storedUser) as { id?: number } : null;
 
   const [formation, setFormation] = useState<FormationData>(mockFormation as unknown as FormationData);
   const [loading, setLoading] = useState(true);
@@ -491,10 +590,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                           const reponse = r as Record<string, unknown>;
                           return String(reponse.contenu || `Option ${ri + 1}`);
                         }),
-                        correct: reponses.findIndex((r: unknown) => {
-                          const reponse = r as Record<string, unknown>;
-                          return reponse.estCorrecte === true;
-                        })
+                        correct: getCorrectAnswerIndex(reponses)
                       };
                     })
                   }
@@ -571,11 +667,84 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
 
   const [activeSessionId, setActiveSessionId] = useState<number | undefined>(undefined);
   const [sessionProgress, setSessionProgress] = useState<Record<number, SessionProgress>>({});
-  const [finalQuizState, setFinalQuizState] = useState<FinalQuizState>({ showFinalQuiz: false, passed: false, score: null, average: 0, allPassed: false });
+  const [finalQuizState, setFinalQuizState] = useState<FinalQuizState>({ showFinalQuiz: false, passed: false, score: null, average: 0, allPassed: false, certificationIssued: false, certificationError: null });
   const [showSessionQuiz, setShowSessionQuiz] = useState(false);
   const [chapterContentViewed, setChapterContentViewed] = useState(false);
   const [showAverageWarning, setShowAverageWarning] = useState(false);
   const [finalQuizQuestions, setFinalQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [finalQuizSaving, setFinalQuizSaving] = useState(false);
+
+  useEffect(() => {
+    if (!formation.id) return;
+
+    const storageKey = buildQuizResultsStorageKey(currentUser?.id, formation.id);
+    const storedResults = localStorage.getItem(storageKey);
+    if (!storedResults) return;
+
+    try {
+      const parsed = JSON.parse(storedResults) as {
+        sessionProgress?: Record<number, SessionProgress>;
+        finalQuiz?: Pick<FinalQuizState, "score" | "passed" | "certificationIssued">;
+      };
+
+      if (parsed.sessionProgress) {
+        setSessionProgress(prev => ({ ...prev, ...parsed.sessionProgress }));
+      }
+
+      if (parsed.finalQuiz) {
+        setFinalQuizState(prev => ({
+          ...prev,
+          score: parsed.finalQuiz?.score ?? prev.score,
+          passed: parsed.finalQuiz?.passed ?? prev.passed,
+          certificationIssued: parsed.finalQuiz?.certificationIssued ?? prev.certificationIssued
+        }));
+      }
+    } catch (error) {
+      console.error("Erreur lecture scores quiz localStorage:", error);
+    }
+  }, [formation.id, currentUser?.id]);
+
+  useEffect(() => {
+    if (!formation.id) return;
+
+    const storageKey = buildQuizResultsStorageKey(currentUser?.id, formation.id);
+    localStorage.setItem(storageKey, JSON.stringify({
+      sessionProgress,
+      finalQuiz: {
+        score: finalQuizState.score,
+        passed: finalQuizState.passed,
+        certificationIssued: finalQuizState.certificationIssued
+      }
+    }));
+  }, [sessionProgress, finalQuizState.score, finalQuizState.passed, finalQuizState.certificationIssued, formation.id, currentUser?.id]);
+
+  useEffect(() => {
+    if (!formation.sessions?.length) {
+      return;
+    }
+
+    const nextProgress = computeFormationProgress(formation.sessions, sessionProgress);
+
+    setFormation((prev: FormationData) => {
+      const nextSessions = prev.sessions.map((session: Session) => ({
+        ...session,
+        completed: isSessionFullyCompleted(session, sessionProgress[session.id])
+      }));
+
+      const progressChanged = prev.progress !== nextProgress;
+      const sessionsChanged = nextSessions.some((session, index) => session.completed !== prev.sessions[index]?.completed);
+
+      if (!progressChanged && !sessionsChanged) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        progress: nextProgress,
+        sessions: nextSessions
+      };
+    });
+  }, [formation.sessions, sessionProgress]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // ✅ CORRECTION : isSessionAccessible
@@ -599,6 +768,30 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
     return true;
   }, [formation.sessions, sessionProgress]);
 
+  const markCurrentChapterAsCompleted = (sessionId: number, chapterIndex: number) => {
+    setSessionProgress(prev => {
+      const currentSessionProgress = prev[sessionId];
+      if (!currentSessionProgress || chapterIndex < 0 || chapterIndex >= currentSessionProgress.chaptersCompleted.length) {
+        return prev;
+      }
+
+      if (currentSessionProgress.chaptersCompleted[chapterIndex]) {
+        return prev;
+      }
+
+      const updatedChaptersCompleted = [...currentSessionProgress.chaptersCompleted];
+      updatedChaptersCompleted[chapterIndex] = true;
+
+      return {
+        ...prev,
+        [sessionId]: {
+          ...currentSessionProgress,
+          chaptersCompleted: updatedChaptersCompleted
+        }
+      };
+    });
+  };
+
   const handleNextChapter = () => {
     if (!activeSession) return;
 
@@ -607,11 +800,18 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
 
     if (chapitres && chapitres.length > 0) {
       const currentChapterIndex = currentProgress?.currentChapterIndex ?? 0;
+      markCurrentChapterAsCompleted(activeSession.id, currentChapterIndex);
 
       if (currentChapterIndex < chapitres.length - 1) {
         setSessionProgress(prev => ({
           ...prev,
-          [activeSession.id]: { ...prev[activeSession.id], currentChapterIndex: currentChapterIndex + 1 }
+          [activeSession.id]: {
+            ...prev[activeSession.id],
+            currentChapterIndex: currentChapterIndex + 1,
+            chaptersCompleted: prev[activeSession.id]?.chaptersCompleted?.map((completed, index) =>
+              index === currentChapterIndex ? true : completed
+            ) || []
+          }
         }));
         setChapterContentViewed(false);
         return;
@@ -638,20 +838,23 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
     handleNextSession();
   };
 
-  const calculateQuizAverage = (): { average: number; allPassed: boolean; failedSessions: number[] } => {
+  const calculateQuizAverage = (
+    progressOverride?: Record<number, SessionProgress>
+  ): { average: number; allPassed: boolean; failedSessions: number[] } => {
     const scores: number[] = [];
     const failedSessions: number[] = [];
+    const progressSource = progressOverride || sessionProgress;
 
     formation.sessions.forEach((session: Session) => {
-      const progress = sessionProgress[session.id];
+      const progress = progressSource[session.id];
       if (progress) {
-        if (progress.quizPassed && progress.quizScore !== null) {
+        if (progress.quizScore !== null) {
           scores.push(progress.quizScore);
-        } else if (session.quiz) {
+        }
+
+        if (session.quiz && !progress.quizPassed) {
           // ✅ Toute session qui CONTIENT un quiz doit être réussie
-          if (!progress.quizPassed) {
-            failedSessions.push(session.id);
-          }
+          failedSessions.push(session.id);
         }
       }
     });
@@ -664,39 +867,35 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
     return { average, allPassed, failedSessions };
   };
 
-  const handleNextSession = () => {
+  const handleNextSession = (progressOverride?: Record<number, SessionProgress>) => {
     if (!activeSession) return;
 
     if (activeIndex < formation.sessions.length - 1) {
-      setFormation((prev: FormationData) => {
-        const newSessions = [...prev.sessions];
-        newSessions[activeIndex] = { ...newSessions[activeIndex], completed: true };
-        return { ...prev, sessions: newSessions };
-      });
       setActiveSessionId(formation.sessions[activeIndex + 1].id);
     } else {
-      const { average, allPassed } = calculateQuizAverage();
+      const { average, allPassed } = calculateQuizAverage(progressOverride);
       
       // ✅ DEBUG : Afficher dans la console les valeurs exactes
       console.log("🔍 DEBUG CALCUL MOYENNE :");
       console.log("   ✅ Moyenne calculée :", average, "%");
       console.log("   ✅ Tous les quiz sont passés :", allPassed);
-      console.log("   ✅ Etat complet sessionProgress :", sessionProgress);
+      console.log("   ✅ Etat complet sessionProgress :", progressOverride || sessionProgress);
       console.log("   ✅ Nombre de sessions dans la formation :", formation.sessions.length);
 
       if (allPassed && average >= 60) {
         // Charger les vraies questions du quiz final depuis la base de données
         apiQuiz.getFinalQuiz(formation.id)
           .then((quizData: FinalQuizResponse) => {
-            if (quizData && quizData.questions) {
-              setFinalQuizQuestions(quizData.questions);
-            }
-            setFinalQuizState({ showFinalQuiz: true, passed: false, score: null, average, allPassed: true });
+            const normalizedQuestions = normalizeQuizQuestions(
+              quizData?.data?.questions || quizData?.questions || []
+            );
+            setFinalQuizQuestions(normalizedQuestions);
+            setFinalQuizState({ showFinalQuiz: true, passed: false, score: null, average, allPassed: true, certificationIssued: false, certificationError: null });
           })
           .catch(() => {
             // Fallback sur le mock si l'API échoue
             setFinalQuizQuestions([{ id: 1, question: "Quiz final - À 100% vous pouvez obtenir votre certificat", options: ["Commencer le quiz final"], correct: 0 }]);
-            setFinalQuizState({ showFinalQuiz: true, passed: false, score: null, average, allPassed: true });
+            setFinalQuizState({ showFinalQuiz: true, passed: false, score: null, average, allPassed: true, certificationIssued: false, certificationError: null });
           });
       } else {
         setShowAverageWarning(true);
@@ -715,9 +914,62 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
     }));
   };
 
-  const handleFinalQuizSubmit = (score: number) => {
-    const passed = score >= 100;
-    setFinalQuizState({ showFinalQuiz: false, passed, score, average: 0, allPassed: false });
+  const createLocalCertificationFallback = () => {
+    const storedCertifications = JSON.parse(localStorage.getItem("certifications") || "[]") as Record<string, unknown>[];
+    const alreadyExists = storedCertifications.some((cert) => Number(cert.formationId) === formation.id);
+    if (alreadyExists) return;
+
+    const nextCertification = {
+      id: Date.now(),
+      apprenantId: currentUser?.id || 0,
+      formationId: formation.id,
+      dateObtention: new Date().toISOString(),
+      formation: {
+        titre: formation.title,
+        professorName: formation.professor.name
+      }
+    };
+
+    localStorage.setItem("certifications", JSON.stringify([nextCertification, ...storedCertifications]));
+  };
+
+  const handleFinalQuizSubmit = async (score: number) => {
+    const passed = score >= 70;
+    setFinalQuizState(prev => ({
+      ...prev,
+      showFinalQuiz: true,
+      passed,
+      score,
+      certificationIssued: false,
+      certificationError: null
+    }));
+
+    if (!passed) {
+      return;
+    }
+
+    try {
+      setFinalQuizSaving(true);
+      await apiCertif.createCertification({ formationId: formation.id });
+      createLocalCertificationFallback();
+      setFinalQuizState(prev => ({
+        ...prev,
+        certificationIssued: true,
+        certificationError: null
+      }));
+      onCertificationEarned?.();
+    } catch (error) {
+      console.error("Erreur création certification:", error);
+      createLocalCertificationFallback();
+      setFinalQuizState(prev => ({
+        ...prev,
+        certificationIssued: true,
+        certificationError: "Certification enregistrée localement. Vérifie la synchronisation serveur."
+      }));
+      onCertificationEarned?.();
+    } finally {
+      setFinalQuizSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -790,12 +1042,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
       const quizContent = activeSession.quiz as Record<string, unknown>;
       const quizInner = quizContent.content as Record<string, unknown> | undefined;
       if (quizInner && quizInner.questions) {
-        const questions = (quizInner.questions as Record<string, unknown>[]).map((q, idx) => ({
-          id: Number(q.id) || (idx + 1),
-          question: String(q.question || q.contenu || ''),
-          options: (q.options as string[]) || (q.reponses as Record<string, unknown>[])?.map((r: Record<string, unknown>) => String(r.contenu || '')) || [],
-          correct: Number(q.correct) >= 0 ? Number(q.correct) : (q.reponses as Record<string, unknown>[])?.findIndex((r: Record<string, unknown>) => r.estCorrecte === true) || 0
-        }));
+        const questions = normalizeQuizQuestions(quizInner.questions as Record<string, unknown>[]);
         return (
           <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-6">
@@ -810,9 +1057,17 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
             <QuizWrapper
               content={{ questions }}
               onSubmit={handleSessionQuizSubmit}
-              onSuccess={() => {
+              onSuccess={(score) => {
+                const nextProgress = {
+                  ...sessionProgress,
+                  [activeSession.id]: {
+                    ...sessionProgress[activeSession.id],
+                    quizPassed: score >= 60,
+                    quizScore: score
+                  }
+                };
                 setShowSessionQuiz(false);
-                handleNextSession();
+                handleNextSession(nextProgress);
               }}
               requiredScore={60}
             />
@@ -823,21 +1078,51 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
 
     if (finalQuizState.showFinalQuiz) {
       return (
-        <div className="bg-white rounded-xl border border-gray-100 p-6 shadow-sm">
+        <div className="bg-gradient-to-br from-purple-50 via-white to-fuchsia-50 rounded-xl border border-purple-100 p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-purple-50 rounded-lg">
-              <Trophy size={24} className="text-purple-500" />
+            <div className="p-2 bg-purple-100 rounded-lg border border-purple-200">
+              <Trophy size={24} className="text-purple-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">Quiz Final - Certification</h2>
-              <p className="text-sm text-gray-500">Répondez correctement à 100% des questions pour obtenir votre certificat</p>
+              <h2 className="text-lg font-semibold text-purple-900">Quiz Final - Certification</h2>
+              <p className="text-sm text-purple-700">Le système corrige automatiquement votre copie. Obtenez au moins 70% pour recevoir votre certificat.</p>
             </div>
           </div>
+          {finalQuizState.score !== null && (
+            <div className={`mb-5 rounded-xl border p-4 ${finalQuizState.passed ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+              <p className={`text-sm font-semibold ${finalQuizState.passed ? "text-emerald-800" : "text-red-800"}`}>
+                {finalQuizState.passed
+                  ? `Quiz final réussi avec ${finalQuizState.score}%.`
+                  : `Quiz final échoué avec ${finalQuizState.score}%. Vous pouvez le repasser.`}
+              </p>
+              {finalQuizState.passed && (
+                <p className="mt-1 text-sm text-emerald-700">
+                  {finalQuizSaving
+                    ? "Création du certificat en cours..."
+                    : finalQuizState.certificationIssued
+                    ? "Votre certification est disponible dans Mes Certificats."
+                    : "Résultat validé. Enregistrement du certificat en cours."}
+                </p>
+              )}
+              {finalQuizState.certificationError && (
+                <p className="mt-1 text-sm text-amber-700">{finalQuizState.certificationError}</p>
+              )}
+            </div>
+          )}
+          {finalQuizQuestions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-purple-200 bg-white/80 p-6 text-center">
+              <p className="text-sm font-medium text-purple-800">Les questions du quiz final sont introuvables pour cette formation.</p>
+              <p className="mt-2 text-sm text-purple-600">Vérifie que le quiz final existe bien en base avec ses questions et réponses.</p>
+            </div>
+          ) : (
           <QuizWrapper
             content={{ questions: finalQuizQuestions }}
             onSubmit={handleFinalQuizSubmit}
-            requiredScore={100}
+            onSuccess={() => onOpenCertificates?.()}
+            requiredScore={70}
+            variant="final"
           />
+          )}
         </div>
       );
     }
@@ -935,7 +1220,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                 || (!chapterContentViewed && !showSessionQuiz)
                 || (activeIndex === formation.sessions.length - 1 && !activeSession?.quiz && (!activeSession?.chapitres || activeSession.chapitres.length === 0))
               }
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-500 rounded-xl hover:bg-teal-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-500 rounded-xl hover:bg-purple-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title={!chapterContentViewed && !showSessionQuiz ? "Vous devez d'abord lire le contenu du chapitre" : ""}
             >
               {!chapterContentViewed && !showSessionQuiz ? "Étudier d'abord" : "Suivant"} <ChevronRight size={16} />
@@ -953,11 +1238,11 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
 
         <div className="p-4 border-b border-gray-100">
           <div className="flex items-start gap-3">
-            <img src={formation.professor.avatar} alt="" className="w-11 h-11 rounded-full object-cover border-2 border-teal-100 shrink-0" />
+            <img src={formation.professor.avatar} alt="" className="w-11 h-11 rounded-full object-cover border-2 border-purple-100 shrink-0" />
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-gray-900 text-sm truncate">{formation.professor.name}</span>
-                {formation.professor.verified && <CheckCircle size={13} className="text-teal-500 shrink-0" />}
+                {formation.professor.verified && <CheckCircle size={13} className="text-purple-500 shrink-0" />}
               </div>
               <p className="text-xs text-gray-400">{formation.professor.role}</p>
               <p className="text-xs text-gray-500 mt-0.5">Spécialité: {formation.professor.specialty}</p>
@@ -966,10 +1251,10 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
           <div className="mt-4">
             <div className="flex justify-between text-xs text-gray-400 mb-1.5">
               <span>Progression</span>
-              <span className="font-semibold text-teal-600">{formation.progress}% Completed</span>
+              <span className="font-semibold text-purple-600">{formation.progress}% Completed</span>
             </div>
             <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-teal-500 rounded-full transition-all duration-500" style={{ width: `${formation.progress}%` }} />
+              <div className="h-full bg-purple-500 rounded-full transition-all duration-500" style={{ width: `${formation.progress}%` }} />
             </div>
           </div>
         </div>
@@ -986,7 +1271,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                   onClick={() => accessible && setActiveSessionId(session.id)}
                   className={`w-full text-left px-3 py-3 rounded-xl transition-all ${
                     activeSessionId === session.id
-                      ? "bg-teal-50 border border-teal-200"
+                      ? "bg-purple-50 border border-purple-200"
                       : !accessible
                       ? "opacity-50 cursor-not-allowed border border-transparent"
                       : "hover:bg-gray-50 border border-transparent"
@@ -997,7 +1282,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                       <SessionIcon type={session.type} size={14} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs font-medium leading-snug ${activeSessionId === session.id ? "text-teal-700" : "text-gray-700"}`}>
+                      <p className={`text-xs font-medium leading-snug ${activeSessionId === session.id ? "text-purple-700" : "text-gray-700"}`}>
                         {session.title}
                       </p>
                       <div className="flex items-center gap-1.5 mt-1">
@@ -1008,7 +1293,7 @@ export default function CourseViewer({ onBack, formationId }: CourseViewerProps)
                    <div className="shrink-0 mt-0.5">
                       {/* 👉 PRIORITE ABSOLUE A LA VALIDATION */}
                       {session.completed ? (
-                        <CheckCircle size={13} className="text-teal-500" />
+                        <CheckCircle size={13} className="text-purple-500" />
                       ) : !accessible ? (
                         <Lock size={12} className="text-gray-300" />
                       ) : null}

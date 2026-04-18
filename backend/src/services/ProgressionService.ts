@@ -3,6 +3,13 @@ import { ProgressionRepo } from "../repository/ProgressionRepo";
 export class ProgressionService {
     private progressionRepo = new ProgressionRepo();
 
+    private countTotalChapters(progression: any): number {
+        return progression?.apprenantFormation?.formation?.sessions?.reduce(
+            (total: number, session: any) => total + (session.chapitres?.length || 0),
+            0
+        ) || 0;
+    }
+
     // Créer une progression pour une nouvelle inscription
     async createProgression(apprenantFormationId: number) {
         return await this.progressionRepo.createForApprenantFormation(apprenantFormationId);
@@ -16,13 +23,17 @@ export class ProgressionService {
             return null;
         }
 
-        // Calculer le pourcentage
         const completedCount = progression.chapitresCompletes?.length || 0;
+        const totalChapters = this.countTotalChapters(progression);
+        const percentage = totalChapters > 0
+            ? Math.round((completedCount / totalChapters) * 100)
+            : 0;
         
         return {
             ...progression,
             completedChapters: completedCount,
-            percentage: 0
+            totalChapters,
+            percentage
         };
     }
 

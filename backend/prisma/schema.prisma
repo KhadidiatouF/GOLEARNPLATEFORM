@@ -20,6 +20,7 @@ model Utilisateur {
   administrateur Administrateur?
   apprenant      Apprenant?
   professeur     Professeur?
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Professeur {
@@ -112,6 +113,37 @@ model Paiement {
   @@index([apprenantFormationId], map: "Paiement_apprenantFormationId_fkey")
 }
 
+model DemandeProfesseur {
+  id                  Int                     @id @default(autoincrement())
+  utilisateurId       Int?
+  utilisateurCreeId   Int?
+  professeurCreeId    Int?
+  nom                 String
+  prenom              String
+  email               String
+  domaineExpertise    String
+  experience          String
+  motivation          String                  @db.Text
+  specialite          String?
+  bio                 String?                 @db.Text
+  statut              StatutDemandeProfesseur @default(EN_ATTENTE)
+  loginGenere         String?
+  dateCreation        DateTime                @default(now())
+  dateTraitement      DateTime?
+}
+
+model PasswordResetToken {
+  id            Int         @id @default(autoincrement())
+  tokenHash     String      @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime    @default(now())
+  utilisateurId Int
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [id], onDelete: Cascade)
+
+  @@index([utilisateurId])
+}
+
 model Certification {
   id            Int       @id @default(autoincrement())
   dateObtention DateTime  @default(now())
@@ -193,6 +225,12 @@ enum StatutProfesseur {
   EN_ATTENTE
   VALIDE
   REJETE
+}
+
+enum StatutDemandeProfesseur {
+  EN_ATTENTE
+  APPROUVEE
+  REJETEE
 }
 
 enum StatutFormation {

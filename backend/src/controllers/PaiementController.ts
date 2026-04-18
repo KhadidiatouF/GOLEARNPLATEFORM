@@ -3,7 +3,7 @@ import { PaiementService } from "../services/PaiementService";
 import { FormaterResponse } from "../middlewares/formateReponse";
 import { HttpCode } from "../enums/codeError";
 import { ZodError } from "zod";
-import { paiementSchema } from "../validators/PaiementValidator";
+import { paiementSchema, updatePaiementSchema } from "../validators/PaiementValidator";
 
 const paiementService = new PaiementService();
 
@@ -38,21 +38,27 @@ export class PaiementController {
     static async createPaiement(req: Request, res: Response, next: NextFunction) {
         try {
             const data = paiementSchema.parse(req.body);
-            const paiementC = await paiementService.createPaiement(data);
+            const utilisateurId = (req as any).user?.id;
+
+            if (!utilisateurId) {
+                return FormaterResponse.failed(res, "Utilisateur non autorise", HttpCode.UNAUTHORIZED);
+            }
+
+            const paiementC = await paiementService.createPaiement(data, utilisateurId);
             return FormaterResponse.success(res, paiementC, "Paiement créé avec succès", HttpCode.CREATED);
         } catch (error: any) {
             if (error instanceof ZodError) {
                 const firstError = error.issues[0]?.message || "Erreur de validation";
                 return FormaterResponse.failed(res, firstError, HttpCode.BAD_REQUEST);
             }
-            return FormaterResponse.failed(res, "Erreur serveur", HttpCode.INTERNAL_SERVER_ERROR);
+            return FormaterResponse.failed(res, error.message || "Erreur serveur", HttpCode.INTERNAL_SERVER_ERROR);
         }
     }
 
     static async updatePaiement(req: Request, res: Response, next: NextFunction) {
         try {
             const id: number = Number(req.params.id);
-            const data = paiementSchema.parse(req.body);
+            const data = updatePaiementSchema.parse(req.body);
             const paiementU = await paiementService.updatePaiement(id, data);
             if (paiementU) {
                 FormaterResponse.success(res, paiementU, "Paiement modifié avec succès", 200);

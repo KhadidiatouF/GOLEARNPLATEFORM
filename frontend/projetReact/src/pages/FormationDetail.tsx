@@ -75,42 +75,10 @@ const FormationDetail: React.FC = () => {
   // Gérer le succès du paiement
   const handlePaymentSuccess = (paymentMethod: string) => {
     if (!cours || !user) return;
-
-    // Simuler l'enregistrement du paiement
-    const paiement = {
-      id: Math.random(),
-      montant: cours.prix,
-      datePaiement: new Date().toISOString(),
-      methode: paymentMethod,
-      coursId: cours.id,
-      utilisateurId: user.id
-    };
-
-    console.log('Paiement enregistré:', paiement);
-
-    // Sauvegarder le paiement dans localStorage
-    const paiements = JSON.parse(localStorage.getItem('paiements') || '[]');
-    paiements.push(paiement);
-    localStorage.setItem('paiements', JSON.stringify(paiements));
-
-    // Créer et sauvegarder l'inscription après paiement
-    const inscription = {
-      id: `${cours.id}-${user.id}`,
-      coursId: cours.id,
-      utilisateurId: user.id,
-      dateInscription: new Date().toISOString(),
-      coursTitre: cours.titre
-    };
-
-    // Sauvegarder dans localStorage
-    const inscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
-    inscriptions.push(inscription);
-    localStorage.setItem('inscriptions', JSON.stringify(inscriptions));
-
-    console.log('Inscription créée (payant):', inscription);
+    console.log('Paiement validé:', paymentMethod);
 
     // Afficher le message de succès
-    setEnrollmentMessage(`Paiement réussi ! Vous êtes inscrit au cours "${cours.titre}". Redirection vers votre tableau de bord...`);
+    setEnrollmentMessage(`Paiement validé pour "${cours.titre}". La formation est maintenant disponible dans votre espace apprenant.`);
 
     // Rediriger vers le dashboard après 2 secondes
     setTimeout(() => {
@@ -463,6 +431,7 @@ const FormationDetail: React.FC = () => {
         <PaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
+          formationId={cours.id}
           courseName={cours.titre}
           amount={cours.prix}
           onPaymentSuccess={handlePaymentSuccess}

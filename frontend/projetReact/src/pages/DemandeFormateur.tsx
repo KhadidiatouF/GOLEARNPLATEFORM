@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, GraduationCap, Users, Mail, AlertCircle } from 'lucide-react';
+import { apiProfesseur } from '../api/apiProfesseur';
 
 interface FormErrors {
   nom?: string;
   prenom?: string;
+  email?: string;
   domaineExpertise?: string;
   experience?: string;
   motivation?: string;
@@ -17,6 +19,7 @@ const DemandeFormateur: React.FC = () => {
   const [formData, setFormData] = useState({
     nom: '',
     prenom: '',
+    email: user?.email || '',
     domaineExpertise: '',
     experience: '',
     motivation: ''
@@ -38,6 +41,12 @@ const DemandeFormateur: React.FC = () => {
       newErrors.prenom = 'Le prénom est requis';
     } else if (formData.prenom.trim().length < 2) {
       newErrors.prenom = 'Le prénom doit contenir au moins 2 caractères';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "L'email est requis";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      newErrors.email = 'Veuillez entrer un email valide';
     }
 
     if (!formData.domaineExpertise) {
@@ -78,25 +87,19 @@ const DemandeFormateur: React.FC = () => {
     setMessage('');
 
     try {
-      const demandes = JSON.parse(localStorage.getItem('demandesFormateur') || '[]');
-      demandes.push({
-        id: Date.now(),
-        utilisateurId: user?.id,
+      await apiProfesseur.createDemande({
         nom: formData.nom.trim(),
         prenom: formData.prenom.trim(),
-        email: user?.email,
+        email: formData.email.trim(),
         domaineExpertise: formData.domaineExpertise,
         experience: formData.experience,
         motivation: formData.motivation.trim(),
-        statut: 'en_attente',
-        date: new Date().toISOString()
       });
-      localStorage.setItem('demandesFormateur', JSON.stringify(demandes));
       
       setMessage('Votre demande a été soumise avec succès. Un administrateur va la traiter.');
       setTimeout(() => navigate('/'), 3000);
-    } catch {
-      setMessage('Erreur lors de la soumission. Veuillez réessayer.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Erreur lors de la soumission. Veuillez réessayer.');
     } finally {
       setLoading(false);
     }
@@ -167,6 +170,27 @@ const DemandeFormateur: React.FC = () => {
                 <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
                   {errors.prenom}
+                </p>
+              )}
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <Mail className="w-4 h-4 inline mr-1" />
+                Email *
+              </label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-[#a855f7] focus:border-transparent ${errors.email ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="votre@email.com"
+              />
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-500 flex items-center gap-1">
+                  <AlertCircle className="w-4 h-4" />
+                  {errors.email}
                 </p>
               )}
             </div>
@@ -250,7 +274,7 @@ const DemandeFormateur: React.FC = () => {
             <div className="md:col-span-2 bg-gray-50 p-4 rounded-lg">
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Mail className="w-4 h-4" />
-                <span>Compte : {user?.email || 'Non connecté'}</span>
+                <span>Cet email recevra le login et le mot de passe si la demande est approuvée.</span>
               </div>
             </div>
 

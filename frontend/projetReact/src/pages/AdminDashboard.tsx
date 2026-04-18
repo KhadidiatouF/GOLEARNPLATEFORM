@@ -3,10 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { apiUsers } from '../api/apiUsers';
 import { apiFormation } from '../api/apiFormation';
 import { apiAdministrateur } from '../api/apiAdministrateur';
+import { apiProfesseur } from '../api/apiProfesseur';
 import DashboardHeader from '../components/DashboardHeader';
 import { Clock, Calendar, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import NotificationDialog from '../components/NotificationDialog';
 import { Chart as ChartJS,CategoryScale,LinearScale,BarElement,Title,Tooltip, Legend, ArcElement, PointElement, LineElement, RadialLinearScale, Filler} from 'chart.js';
 import { Bar, Doughnut, Line, PolarArea } from 'react-chartjs-2';
 
@@ -140,12 +142,54 @@ export default function AdminDashboard() {
     professeur?: { specialite?: string; bio?: string };
   }
 
+  interface DemandeProfesseur {
+    id: number;
+    nom: string;
+    prenom: string;
+    email: string;
+    domaineExpertise: string;
+    experience: string;
+    motivation: string;
+    specialite?: string;
+    bio?: string;
+    statut: 'EN_ATTENTE' | 'APPROUVEE' | 'REJETEE';
+    dateCreation: string;
+    dateTraitement?: string | null;
+    loginGenere?: string | null;
+  }
+
   // Gestion des utilisateurs
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<{ id: number | undefined; nom: string; prenom: string; email: string; login: string; mdp?: string; role: string; specialite?: string; bio?: string; niveau?: string } | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [teacherRequests, setTeacherRequests] = useState<DemandeProfesseur[]>([]);
+  const [teacherRequestsLoading, setTeacherRequestsLoading] = useState(true);
+  const [notification, setNotification] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'error' | 'success' | 'info' | 'warning';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showNotification = (
+    title: string,
+    message: string,
+    type: 'error' | 'success' | 'info' | 'warning' = 'info'
+  ) => {
+    setNotification({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
 
   // États pour la pagination et filtration des formations
   const [formationSearch, setFormationSearch] = useState('');
@@ -393,7 +437,7 @@ export default function AdminDashboard() {
         setIsUserDeleteDialogOpen(false);
       } catch (error) {
         console.error('Erreur lors de la suppression:', error);
-        alert('Erreur lors de la suppression');
+        showNotification('Suppression impossible', 'Erreur lors de la suppression.', 'error');
       }
     }
   };
@@ -408,7 +452,7 @@ export default function AdminDashboard() {
         setIsDeleteDialogOpen(false);
       } catch (error) {
         console.error('Erreur lors de la suppression de la formation:', error);
-        alert('Erreur lors de la suppression de la formation');
+        showNotification('Suppression impossible', 'Erreur lors de la suppression de la formation.', 'error');
       }
     }
   };
@@ -475,7 +519,7 @@ export default function AdminDashboard() {
         setEditingUser(null);
       } catch (error) {
         console.error('Erreur lors de la sauvegarde:', error);
-        alert('Erreur lors de la sauvegarde');
+        showNotification('Enregistrement impossible', 'Erreur lors de la sauvegarde.', 'error');
       }
     }
   };
@@ -523,6 +567,19 @@ export default function AdminDashboard() {
       console.error('Erreur lors du chargement des statistiques:', error);
     } finally {
       setStatisticsLoading(false);
+    }
+  };
+
+  const fetchTeacherRequests = async () => {
+    setTeacherRequestsLoading(true);
+    try {
+      const response = await apiProfesseur.getDemandes();
+      setTeacherRequests(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Erreur lors du chargement des demandes professeur:', error);
+      setTeacherRequests([]);
+    } finally {
+      setTeacherRequestsLoading(false);
     }
   };
 
@@ -594,11 +651,13 @@ export default function AdminDashboard() {
     fetchUsers(userPage, userSearch, userFilterRole);
     fetchStatistics();
     fetchFormations();
+    fetchTeacherRequests();
 
     // Rafraichir automatiquement les statistiques toutes les 30 secondes
     const interval = setInterval(() => {
       fetchStatistics();
       fetchFormations();
+      fetchTeacherRequests();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -1604,28 +1663,11 @@ const getFirstDayOfMonth = (year: number, month: number) => {
               </div>
             </div>
             {(() => {
-              const demandes = JSON.parse(localStorage.getItem('demandesFormateur') || '[]');
-              const pendingDemandes = demandes.filter((d: { statut: string }) => d.statut === 'en_attente');
-              const approvedDemandes = demandes.filter((d: { statut: string }) => d.statut === 'approuve');
-              const rejectedDemandes = demandes.filter((d: { statut: string }) => d.statut === 'rejete');
+              const pendingDemandes = teacherRequests.filter((d) => d.statut === 'EN_ATTENTE');
+              const approvedDemandes = teacherRequests.filter((d) => d.statut === 'APPROUVEE');
+              const rejectedDemandes = teacherRequests.filter((d) => d.statut === 'REJETEE');
 
-              const handleValide = (id: number) => {
-                const updatedDemandes = demandes.map((d: { id: number }) => 
-                  d.id === id ? { ...d, statut: 'approuve' } : d
-                );
-                localStorage.setItem('demandesFormateur', JSON.stringify(updatedDemandes));
-                window.location.reload();
-              };
-
-              const handleReject = (id: number) => {
-                const updatedDemandes = demandes.map((d: { id: number }) => 
-                  d.id === id ? { ...d, statut: 'rejete' } : d
-                );
-                localStorage.setItem('demandesFormateur', JSON.stringify(updatedDemandes));
-                window.location.reload();
-              };
-
-              const domaineLabels: { [key: string]: string } = {
+              const domaineLabels: Record<string, string> = {
                 developpement_web: 'Développement Web',
                 developpement_mobile: 'Développement Mobile',
                 data_science: 'Data Science',
@@ -1638,9 +1680,40 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                 autre: 'Autre'
               };
 
+              const handleValide = async (id: number) => {
+                try {
+                  await apiProfesseur.validerDemande(id);
+                  await fetchTeacherRequests();
+                  showNotification('Demande approuvée', 'Le compte professeur a été créé et les identifiants ont été envoyés par email.', 'success');
+                } catch (error) {
+                  showNotification(
+                    'Validation impossible',
+                    error instanceof Error ? error.message : 'Erreur lors de la validation de la demande',
+                    'error'
+                  );
+                }
+              };
+
+              const handleReject = async (id: number) => {
+                try {
+                  await apiProfesseur.rejeterDemande(id);
+                  await fetchTeacherRequests();
+                  showNotification('Demande rejetée', 'La demande de formateur a été rejetée.', 'info');
+                } catch (error) {
+                  showNotification(
+                    'Rejet impossible',
+                    error instanceof Error ? error.message : 'Erreur lors du rejet de la demande',
+                    'error'
+                  );
+                }
+              };
+
+              if (teacherRequestsLoading) {
+                return <p className="text-sm text-gray-500">Chargement des demandes...</p>;
+              }
+
               return (
                 <div className="space-y-8">
-                  {/* En attente */}
                   <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-5 border border-orange-200">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
@@ -1657,7 +1730,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {pendingDemandes.map((demande: { id: number; nom: string; prenom: string; email: string; domaineExpertise: string; experience: string; motivation: string; date: string }) => (
+                        {pendingDemandes.map((demande) => (
                           <div key={demande.id} className="bg-white rounded-xl shadow-md p-4 hover:shadow-lg transition-shadow">
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center gap-3">
@@ -1672,21 +1745,23 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                             </div>
                             <div className="space-y-2 mb-4">
                               <div className="flex items-center gap-2 text-sm">
-                                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">{domaineLabels[demande.domaineExpertise] || demande.domaineExpertise}</span>
+                                <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                                  {domaineLabels[demande.domaineExpertise] || demande.domaineExpertise}
+                                </span>
                                 <span className="text-gray-500">•</span>
                                 <span className="text-gray-600">{demande.experience} ans</span>
                               </div>
                               <p className="text-sm text-gray-600 line-clamp-2">{demande.motivation}</p>
-                              <p className="text-xs text-gray-400">{new Date(demande.date).toLocaleDateString('fr-FR')}</p>
+                              <p className="text-xs text-gray-400">{new Date(demande.dateCreation).toLocaleDateString('fr-FR')}</p>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => handleValide(demande.id)} className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                              <button onClick={() => void handleValide(demande.id)} className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
                                 Valider
                               </button>
-                              <button onClick={() => handleReject(demande.id)} className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
+                              <button onClick={() => void handleReject(demande.id)} className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -1699,7 +1774,6 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                     )}
                   </div>
 
-                  {/* Approuvées */}
                   <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-5 border border-green-200">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -1711,7 +1785,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                       <p className="text-green-600 text-center py-4">Aucune demande approuvée</p>
                     ) : (
                       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        {approvedDemandes.map((demande: { id: number; nom: string; prenom: string; email: string; domaineExpertise: string }) => (
+                        {approvedDemandes.map((demande) => (
                           <div key={demande.id} className="bg-white rounded-lg shadow-sm p-3 flex items-center gap-3">
                             <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
                               <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1721,6 +1795,9 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-gray-800 truncate">{demande.nom} {demande.prenom}</p>
                               <p className="text-xs text-gray-500 truncate">{demande.email}</p>
+                              {demande.loginGenere && (
+                                <p className="text-xs text-green-700 truncate mt-1">Login envoyé : {demande.loginGenere}</p>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -1728,7 +1805,6 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                     )}
                   </div>
 
-                  {/* Rejetées */}
                   <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-5 border border-red-200">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
@@ -1740,7 +1816,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                       <p className="text-red-600 text-center py-4">Aucune demande rejetée</p>
                     ) : (
                       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        {rejectedDemandes.map((demande: { id: number; nom: string; prenom: string; email: string }) => (
+                        {rejectedDemandes.map((demande) => (
                           <div key={demande.id} className="bg-white rounded-lg shadow-sm p-3 flex items-center gap-3">
                             <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
                               <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1916,6 +1992,13 @@ const getFirstDayOfMonth = (year: number, month: number) => {
         onConfirm={confirmDeleteUser}
         onCancel={() => setIsUserDeleteDialogOpen(false)}
         type="danger"
+      />
+      <NotificationDialog
+        isOpen={notification.isOpen}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+        onClose={() => setNotification(prev => ({ ...prev, isOpen: false }))}
       />
     </>
   );

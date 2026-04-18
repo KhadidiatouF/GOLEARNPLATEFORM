@@ -56,8 +56,31 @@ export class CertificationController {
 
     static async createCertification(req: Request, res: Response, next: NextFunction) {
         try {
-            const data = certificationSchema.parse(req.body);
-            const certificationC = await certificationService.createCertification(data);
+            const userId = (req as any).user?.id;
+
+            if (!userId) {
+                return FormaterResponse.failed(res, "Utilisateur non authentifié", HttpCode.UNAUTHORIZED);
+            }
+
+            const formationId = Number(req.body?.formationId);
+            if (!formationId || formationId <= 0) {
+                return FormaterResponse.failed(res, "L'ID de la formation est requis", HttpCode.BAD_REQUEST);
+            }
+
+            const prisma = new PrismaClient();
+            const apprenant = await prisma.apprenant.findFirst({
+                where: { utilisateurId: Number(userId) }
+            });
+
+            if (!apprenant) {
+                return FormaterResponse.failed(res, "Apprenant introuvable", HttpCode.NOT_FOUND);
+            }
+
+            const data = certificationSchema.parse({
+                apprenantId: apprenant.id,
+                formationId
+            });
+            const certificationC = await certificationService.createCertificationIfMissing(data.apprenantId, data.formationId);
             return FormaterResponse.success(res, certificationC, "Certification créée avec succès", HttpCode.CREATED);
         } catch (error: any) {
             if (error instanceof ZodError) {
