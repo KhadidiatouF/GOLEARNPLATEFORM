@@ -13,6 +13,18 @@ export declare class CertificationService {
         page: number;
         limit: number;
     }>;
+    getAllCertificationsWithRelations(): Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+    }>;
+    getCertificationsByProfessorId(professeurId: number): Promise<{
+        data: any[];
+        total: number;
+        page: number;
+        limit: number;
+    }>;
     getOneCertification(id: number): Promise<any>;
     createCertification(data: any): Promise<{
         id: number;

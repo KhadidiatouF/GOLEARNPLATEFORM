@@ -1,5 +1,6 @@
 export declare class ProgressionService {
     private progressionRepo;
+    private countTotalChapters;
     createProgression(apprenantFormationId: number): Promise<{
         id: number;
         apprenantFormationId: number;

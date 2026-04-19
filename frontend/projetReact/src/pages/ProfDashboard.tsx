@@ -8,7 +8,8 @@ import { apiFormation } from '../api/apiFormation';
 import { apiProgression } from '../api/apiProgression';
 import { apiUsers } from '../api/apiUsers';
 import { apiProfesseur } from '../api/apiProfesseur';
-import { BookOpen, Users, Calendar, Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { apiCertif } from '../api/apiCertif';
+import { BookOpen, Users, Calendar, Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight, Award } from 'lucide-react';
 
 // Types pour la création complète de formation
 
@@ -88,6 +89,22 @@ interface RevenueHistoryItem {
   apprenantEmail: string;
 }
 
+interface CertifiedLearner {
+  id: number;
+  dateObtention: string;
+  apprenant?: {
+    utilisateur?: {
+      nom?: string;
+      prenom?: string;
+      email?: string;
+    };
+  };
+  formation?: {
+    id?: number;
+    titre?: string;
+  };
+}
+
 // Interface pour les données de formation reçues de l'API
 interface FormationFromAPI {
   id: number;
@@ -107,7 +124,7 @@ interface FormationFromAPI {
   apprenants?: { id: number }[];
 }
 
-type TabType = 'dashboard' | 'formations' | 'apprenants' | 'solde' | 'parametres';
+type TabType = 'dashboard' | 'formations' | 'apprenants' | 'certified' | 'solde' | 'parametres';
 
 interface MenuItem {
   id: TabType;
@@ -142,6 +159,11 @@ const menuItems: MenuItem[] = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
       </svg>
     )
+  },
+  {
+    id: 'certified',
+    label: 'Apprenants certifiés',
+    icon: <Award className="w-5 h-5" />
   },
   {
     id: 'solde',
@@ -207,6 +229,13 @@ export default function ProfDashboard() {
   // État pour les apprenants inscrits (dynamique)
   const [enrolledApprenants, setEnrolledApprenants] = useState<ApprenantData[]>([]);
   const [apprenantsLoading, setApprenantsLoading] = useState(true);
+  const [certifiedLearners, setCertifiedLearners] = useState<CertifiedLearner[]>([]);
+  const [certifiedLearnersLoading, setCertifiedLearnersLoading] = useState(true);
+  const [certifiedSearch, setCertifiedSearch] = useState('');
+  const [certifiedFilterCourse, setCertifiedFilterCourse] = useState('');
+  const [certifiedPage, setCertifiedPage] = useState(1);
+  const certifiedPerPage = 10;
+  const [showWithdrawOptions, setShowWithdrawOptions] = useState(false);
 
 
 
@@ -252,6 +281,15 @@ export default function ProfDashboard() {
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  const handleProfessorWithdrawal = (method: 'WAVE' | 'OM') => {
+    const methodLabel = method === 'WAVE' ? 'Wave' : 'Orange Money';
+    setShowWithdrawOptions(false);
+    setSubmitStatus({
+      type: 'success',
+      message: `Votre demande de retrait par ${methodLabel} a bien été enregistrée.`
+    });
   };
 
   const resetCourseForm = () => {
@@ -535,6 +573,23 @@ export default function ProfDashboard() {
       setRevenueHistoryLoading(false);
     }
   }, [user?.role]);
+
+  useEffect(() => {
+    const fetchCertifiedLearners = async () => {
+      try {
+        setCertifiedLearnersLoading(true);
+        const response = await apiCertif.getProfessorCertifications();
+        setCertifiedLearners(Array.isArray(response?.data?.data) ? response.data.data : []);
+      } catch (error) {
+        console.error("Erreur lors du chargement des apprenants certifiés du professeur:", error);
+        setCertifiedLearners([]);
+      } finally {
+        setCertifiedLearnersLoading(false);
+      }
+    };
+
+    fetchCertifiedLearners();
+  }, []);
 
 
   // ── Variables calculées pour les statistiques dynamiques du professeur ──
@@ -855,9 +910,9 @@ export default function ProfDashboard() {
                             </div>
                           </div>
 
-                          <div className="relative z-10 mt-5 rounded-2xl bg-gradient-to-br from-purple-50 via-white to-purple-50/60 p-4 ring-1 ring-purple-100">
-                            <h3 className="text-lg font-bold tracking-tight text-purple-900">{course.titre}</h3>
-                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-purple-700/80">{course.description}</p>
+                          <div className="relative z-10 mt-5 rounded-2xl bg-purple-600 p-4 ring-1 ring-purple-400 text-white">
+                            <h3 className="text-lg font-bold tracking-tight">{course.titre}</h3>
+                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-white">{course.description}</p>
 
                             <div className="mt-4 flex flex-wrap items-center gap-3">
                               <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-100">
@@ -1477,6 +1532,115 @@ export default function ProfDashboard() {
           </div>
         );
       }
+      case 'certified': {
+        const filteredCertifiedLearners = certifiedLearners.filter((item) => {
+          const learnerName = `${item.apprenant?.utilisateur?.prenom || ''} ${item.apprenant?.utilisateur?.nom || ''}`.trim().toLowerCase();
+          const learnerEmail = (item.apprenant?.utilisateur?.email || '').toLowerCase();
+          const formationTitle = (item.formation?.titre || '').toLowerCase();
+          const searchValue = certifiedSearch.toLowerCase();
+
+          const matchesSearch = !searchValue || learnerName.includes(searchValue) || learnerEmail.includes(searchValue) || formationTitle.includes(searchValue);
+          const matchesFormation = !certifiedFilterCourse || item.formation?.titre === certifiedFilterCourse;
+          return matchesSearch && matchesFormation;
+        });
+
+        const totalCertifiedPages = Math.max(1, Math.ceil(filteredCertifiedLearners.length / certifiedPerPage));
+        const paginatedCertifiedLearners = filteredCertifiedLearners.slice(
+          (certifiedPage - 1) * certifiedPerPage,
+          certifiedPage * certifiedPerPage
+        );
+
+        return (
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
+              Apprenants certifiés
+            </h2>
+
+            <div className="flex flex-wrap gap-4 mb-6">
+              <div className="flex-1 min-w-[220px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher par apprenant, email ou formation..."
+                    value={certifiedSearch}
+                    onChange={(e) => { setCertifiedSearch(e.target.value); setCertifiedPage(1); }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+              <div className="min-w-[220px]">
+                <select
+                  value={certifiedFilterCourse}
+                  onChange={(e) => { setCertifiedFilterCourse(e.target.value); setCertifiedPage(1); }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">Toutes les formations</option>
+                  {[...new Set(certifiedLearners.map(item => item.formation?.titre).filter(Boolean))].map((title) => (
+                    <option key={title} value={title}>{title}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {certifiedLearnersLoading ? (
+              <p className="text-center text-gray-500 py-8">Chargement des apprenants certifiés...</p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-purple-50">
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Apprenant</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Formation</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date d'obtention</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedCertifiedLearners.map((item) => (
+                        <tr key={item.id} className="border-b hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 font-medium text-gray-800">
+                            {`${item.apprenant?.utilisateur?.prenom || ''} ${item.apprenant?.utilisateur?.nom || ''}`.trim() || 'Apprenant'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{item.apprenant?.utilisateur?.email || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.formation?.titre || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.dateObtention ? new Date(item.dateObtention).toLocaleDateString('fr-FR') : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredCertifiedLearners.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Aucun apprenant certifié trouvé pour vos formations</p>
+                )}
+
+                {filteredCertifiedLearners.length > certifiedPerPage && (
+                  <div className="flex justify-center items-center gap-2 mt-6">
+                    <button
+                      onClick={() => setCertifiedPage(p => Math.max(1, p - 1))}
+                      disabled={certifiedPage === 1}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm text-gray-600">Page {certifiedPage} sur {totalCertifiedPages}</span>
+                    <button
+                      onClick={() => setCertifiedPage(p => Math.min(totalCertifiedPages, p + 1))}
+                      disabled={certifiedPage === totalCertifiedPages}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      }
       case 'solde':
         return (
           <div className="bg-white rounded-xl shadow-lg p-6">
@@ -1487,9 +1651,42 @@ export default function ProfDashboard() {
             <div className="space-y-6">
               {/* Solde actuel */}
               <div className="p-6 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl text-white">
-                <p className="text-sm opacity-90 mb-1">Solde disponible</p>
-                <p className="text-4xl font-bold">{solde.toLocaleString()} XOF</p>
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-sm opacity-90 mb-1">Solde disponible</p>
+                    <p className="text-4xl font-bold">{solde.toLocaleString()} XOF</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setShowWithdrawOptions((prev) => !prev)}
+                      className="px-4 py-2.5 rounded-lg bg-white text-purple-700 font-semibold hover:bg-purple-50 transition-colors"
+                    >
+                      Retirer mes revenus
+                    </button>
+                    {showWithdrawOptions && (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleProfessorWithdrawal('WAVE')}
+                          className="px-4 py-2 rounded-lg bg-sky-100 text-sky-700 font-medium hover:bg-sky-200 transition-colors"
+                        >
+                          Retrait par Wave
+                        </button>
+                        <button
+                          onClick={() => handleProfessorWithdrawal('OM')}
+                          className="px-4 py-2 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 transition-colors"
+                        >
+                          Retrait par Orange Money
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
+              {submitStatus.message && (
+                <div className={`p-4 rounded-lg ${submitStatus.type === 'success' ? 'bg-purple-50 border border-green-200 text-purple-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
+                  <p className="text-sm">{submitStatus.message}</p>
+                </div>
+              )}
               {/* Historique des revenus */}
               <div>
                 <h3 className="font-semibold text-gray-800 mb-4">Historique des revenus</h3>

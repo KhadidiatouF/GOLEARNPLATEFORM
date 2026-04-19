@@ -158,6 +158,19 @@ class ProfessController {
             return formateReponse_1.FormaterResponse.failed(res, error.message || "Erreur lors du rejet", codeError_1.HttpCode.BAD_REQUEST);
         }
     }
+    static async getHistoriqueRevenus(req, res) {
+        try {
+            const professeurId = req.user?.professeurId;
+            if (!professeurId) {
+                return formateReponse_1.FormaterResponse.failed(res, "Professeur non trouve", codeError_1.HttpCode.BAD_REQUEST);
+            }
+            const historique = await professeurService.getHistoriqueRevenus(professeurId);
+            return formateReponse_1.FormaterResponse.success(res, historique, "Historique des revenus recupere avec succes", codeError_1.HttpCode.OK);
+        }
+        catch (error) {
+            return formateReponse_1.FormaterResponse.failed(res, error.message || "Erreur serveur", codeError_1.HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
 }
 exports.ProfessController = ProfessController;
 //# sourceMappingURL=ProfesseurController.js.map

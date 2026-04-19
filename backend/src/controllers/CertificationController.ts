@@ -3,12 +3,47 @@ import { CertificationService } from "../services/CertificationService";
 import { FormaterResponse } from "../middlewares/formateReponse";
 import { HttpCode } from "../enums/codeError";
 import { ZodError } from "zod";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 import { certificationSchema } from "../validators/CertificationValidator";
 
 const certificationService = new CertificationService();
 
 export class CertificationController {
+    static async getAdminCertifications(req: Request, res: Response) {
+        try {
+            const role = (req as any).user?.role;
+
+            if (role !== Role.ADMIN) {
+                return FormaterResponse.failed(res, "Accès refusé", HttpCode.FORBIDDEN);
+            }
+
+            const certifications = await certificationService.getAllCertificationsWithRelations();
+            return FormaterResponse.success(res, certifications, "Certifications globales récupérées avec succès", HttpCode.OK);
+        } catch (error: any) {
+            return FormaterResponse.failed(res, error.message || "Erreur lors de la récupération des certifications", HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    static async getProfessorCertifications(req: Request, res: Response) {
+        try {
+            const role = (req as any).user?.role;
+            const professeurId = (req as any).user?.professeurId;
+
+            if (role !== Role.PROF) {
+                return FormaterResponse.failed(res, "Accès refusé", HttpCode.FORBIDDEN);
+            }
+
+            if (!professeurId) {
+                return FormaterResponse.failed(res, "Professeur introuvable", HttpCode.NOT_FOUND);
+            }
+
+            const certifications = await certificationService.getCertificationsByProfessorId(Number(professeurId));
+            return FormaterResponse.success(res, certifications, "Certifications du professeur récupérées avec succès", HttpCode.OK);
+        } catch (error: any) {
+            return FormaterResponse.failed(res, error.message || "Erreur lors de la récupération des certifications", HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     static async getAllCertifications(req: Request, res: Response, next: NextFunction) {
         try {
             const userId = (req as any).user?.id;

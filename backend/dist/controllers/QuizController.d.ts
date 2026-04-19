@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import type { AuthRequest } from "../middlewares/auth";
 export declare class QuizController {
     static getAllQuizzes(req: Request, res: Response, next: NextFunction): Promise<void>;
     static getOneQuiz(req: Request, res: Response, next: NextFunction): Promise<void>;
@@ -22,5 +23,6 @@ export declare class QuizController {
      * GET /quiz/formation/:formationId/summary
      */
     static getQuizSummary(req: Request, res: Response, next: NextFunction): Promise<Response<any, Record<string, any>> | undefined>;
+    static getCoachFeedback(req: AuthRequest, res: Response): Promise<Response<any, Record<string, any>>>;
 }
 //# sourceMappingURL=QuizController.d.ts.map

@@ -4,8 +4,9 @@ import { apiUsers } from '../api/apiUsers';
 import { apiFormation } from '../api/apiFormation';
 import { apiAdministrateur } from '../api/apiAdministrateur';
 import { apiProfesseur } from '../api/apiProfesseur';
+import { apiCertif } from '../api/apiCertif';
 import DashboardHeader from '../components/DashboardHeader';
-import { Clock, Calendar, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Calendar, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight, Award } from 'lucide-react';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import NotificationDialog from '../components/NotificationDialog';
@@ -13,7 +14,7 @@ import DashboardSettingsPanel from '../components/DashboardSettingsPanel';
 import { Chart as ChartJS,CategoryScale,LinearScale,BarElement,Title,Tooltip, Legend, ArcElement, PointElement, LineElement, RadialLinearScale, Filler} from 'chart.js';
 import { Bar, Doughnut, Line, PolarArea } from 'react-chartjs-2';
 
-type TabType = 'overview' | 'users' | 'formations' | 'stats' | 'revenus' | 'demandes' | 'settings';
+type TabType = 'overview' | 'users' | 'formations' | 'certified' | 'stats' | 'revenus' | 'demandes' | 'settings';
 
 interface MenuItem {
   id: TabType;
@@ -48,6 +49,11 @@ const menuItems: MenuItem[] = [
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
       </svg>
     )
+  },
+  {
+    id: 'certified',
+    label: 'Apprenants certifiés',
+    icon: <Award className="w-5 h-5" />
   },
   {
     id: 'stats',
@@ -159,6 +165,27 @@ export default function AdminDashboard() {
     loginGenere?: string | null;
   }
 
+  interface CertifiedLearner {
+    id: number;
+    dateObtention: string;
+    apprenant?: {
+      utilisateur?: {
+        nom?: string;
+        prenom?: string;
+        email?: string;
+      };
+    };
+    formation?: {
+      titre?: string;
+      professeur?: {
+        utilisateur?: {
+          nom?: string;
+          prenom?: string;
+        };
+      };
+    };
+  }
+
   // Gestion des utilisateurs
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -167,6 +194,13 @@ export default function AdminDashboard() {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [teacherRequests, setTeacherRequests] = useState<DemandeProfesseur[]>([]);
   const [teacherRequestsLoading, setTeacherRequestsLoading] = useState(true);
+  const [certifiedLearners, setCertifiedLearners] = useState<CertifiedLearner[]>([]);
+  const [certifiedLearnersLoading, setCertifiedLearnersLoading] = useState(true);
+  const [certifiedSearch, setCertifiedSearch] = useState('');
+  const [certifiedFormationFilter, setCertifiedFormationFilter] = useState('');
+  const [certifiedPage, setCertifiedPage] = useState(1);
+  const certifiedPerPage = 8;
+  const [showWithdrawOptions, setShowWithdrawOptions] = useState(false);
   const [notification, setNotification] = useState<{
     isOpen: boolean;
     title: string;
@@ -190,6 +224,16 @@ export default function AdminDashboard() {
       message,
       type
     });
+  };
+
+  const handleAdminWithdrawal = (method: 'WAVE' | 'OM') => {
+    const methodLabel = method === 'WAVE' ? 'Wave' : 'Orange Money';
+    setShowWithdrawOptions(false);
+    showNotification(
+      'Demande de retrait enregistrée',
+      `La demande de retrait des revenus plateforme par ${methodLabel} a bien été prise en compte.`,
+      'success'
+    );
   };
 
   // États pour la pagination et filtration des formations
@@ -585,6 +629,19 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchCertifiedLearners = async () => {
+    setCertifiedLearnersLoading(true);
+    try {
+      const response = await apiCertif.getAdminCertifications();
+      setCertifiedLearners(Array.isArray(response?.data?.data) ? response.data.data : []);
+    } catch (error) {
+      console.error('Erreur lors du chargement des apprenants certifiés:', error);
+      setCertifiedLearners([]);
+    } finally {
+      setCertifiedLearnersLoading(false);
+    }
+  };
+
   // Charger les formations depuis l'API
   const fetchFormations = async () => {
     try {
@@ -654,12 +711,14 @@ export default function AdminDashboard() {
     fetchStatistics();
     fetchFormations();
     fetchTeacherRequests();
+    fetchCertifiedLearners();
 
     // Rafraichir automatiquement les statistiques toutes les 30 secondes
     const interval = setInterval(() => {
       fetchStatistics();
       fetchFormations();
       fetchTeacherRequests();
+      fetchCertifiedLearners();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -1253,6 +1312,117 @@ const getFirstDayOfMonth = (year: number, month: number) => {
 
           </div>
         );
+      case 'certified': {
+        const filteredCertifiedLearners = certifiedLearners.filter((item) => {
+          const learnerName = `${item.apprenant?.utilisateur?.prenom || ''} ${item.apprenant?.utilisateur?.nom || ''}`.trim().toLowerCase();
+          const learnerEmail = (item.apprenant?.utilisateur?.email || '').toLowerCase();
+          const formationTitle = (item.formation?.titre || '').toLowerCase();
+          const searchValue = certifiedSearch.toLowerCase();
+
+          const matchesSearch = !searchValue || learnerName.includes(searchValue) || learnerEmail.includes(searchValue) || formationTitle.includes(searchValue);
+          const matchesFormation = !certifiedFormationFilter || item.formation?.titre === certifiedFormationFilter;
+          return matchesSearch && matchesFormation;
+        });
+
+        const totalPages = Math.max(1, Math.ceil(filteredCertifiedLearners.length / certifiedPerPage));
+        const paginatedCertifiedLearners = filteredCertifiedLearners.slice((certifiedPage - 1) * certifiedPerPage, certifiedPage * certifiedPerPage);
+
+        return (
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
+              <Award className="w-6 h-6 text-purple-600" />
+              Apprenants certifiés
+            </h2>
+
+            <div className="flex flex-wrap gap-4 mb-6">
+              <div className="flex-1 min-w-[220px]">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Rechercher par apprenant, email ou formation..."
+                    value={certifiedSearch}
+                    onChange={(e) => { setCertifiedSearch(e.target.value); setCertifiedPage(1); }}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+              <div className="min-w-[220px]">
+                <select
+                  value={certifiedFormationFilter}
+                  onChange={(e) => { setCertifiedFormationFilter(e.target.value); setCertifiedPage(1); }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                >
+                  <option value="">Toutes les formations</option>
+                  {[...new Set(certifiedLearners.map(item => item.formation?.titre).filter(Boolean))].map((title) => (
+                    <option key={title} value={title}>{title}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {certifiedLearnersLoading ? (
+              <p className="text-center text-gray-500 py-8">Chargement des apprenants certifiés...</p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-purple-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Apprenant</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Formation</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Professeur</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date d'obtention</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginatedCertifiedLearners.map((item) => (
+                        <tr key={item.id} className="border-b hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 font-medium text-gray-800">
+                            {`${item.apprenant?.utilisateur?.prenom || ''} ${item.apprenant?.utilisateur?.nom || ''}`.trim() || 'Apprenant'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{item.apprenant?.utilisateur?.email || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.formation?.titre || '-'}</td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {`${item.formation?.professeur?.utilisateur?.prenom || ''} ${item.formation?.professeur?.utilisateur?.nom || ''}`.trim() || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">{item.dateObtention ? new Date(item.dateObtention).toLocaleDateString('fr-FR') : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {filteredCertifiedLearners.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Aucun apprenant certifié trouvé</p>
+                )}
+
+                {filteredCertifiedLearners.length > certifiedPerPage && (
+                  <div className="flex justify-center items-center gap-2 mt-6">
+                    <button
+                      onClick={() => setCertifiedPage(p => Math.max(1, p - 1))}
+                      disabled={certifiedPage === 1}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm text-gray-600">Page {certifiedPage} sur {totalPages}</span>
+                    <button
+                      onClick={() => setCertifiedPage(p => Math.min(totalPages, p + 1))}
+                      disabled={certifiedPage === totalPages}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      }
       
       case 'stats': {
         // ===== 1. Données pour Diagramme en Bande (Barres) =====
@@ -1553,6 +1723,39 @@ const getFirstDayOfMonth = (year: number, month: number) => {
       case 'revenus':
         return (
           <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Retirer mes revenus</h2>
+                  <p className="text-sm text-gray-500 mt-1">Choisissez votre moyen de retrait pour les revenus de la plateforme.</p>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <button
+                    onClick={() => setShowWithdrawOptions((prev) => !prev)}
+                    className="px-4 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+                  >
+                    Retirer mes revenus
+                  </button>
+                  {showWithdrawOptions && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleAdminWithdrawal('WAVE')}
+                        className="px-4 py-2 rounded-lg bg-sky-100 text-sky-700 font-medium hover:bg-sky-200 transition-colors"
+                      >
+                        Retrait par Wave
+                      </button>
+                      <button
+                        onClick={() => handleAdminWithdrawal('OM')}
+                        className="px-4 py-2 rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200 transition-colors"
+                      >
+                        Retrait par Orange Money
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
                 <div className="flex items-center justify-between">

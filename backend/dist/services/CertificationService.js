@@ -13,6 +13,12 @@ class CertificationService {
     getCertificationsByApprenantId(apprenantId) {
         return this.certificationRepo.findAll(1, 100, apprenantId);
     }
+    getAllCertificationsWithRelations() {
+        return this.certificationRepo.findAllWithRelations(1, 100);
+    }
+    getCertificationsByProfessorId(professeurId) {
+        return this.certificationRepo.findByProfessorId(professeurId, 1, 100);
+    }
     getOneCertification(id) {
         return this.certificationRepo.findById(id);
     }

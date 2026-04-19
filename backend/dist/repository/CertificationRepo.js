@@ -34,6 +34,56 @@ class CertificationRepo {
             }
         });
     }
+    async findAllWithRelations(page = 1, limit = 100) {
+        const skip = (page - 1) * limit;
+        const [certs, total] = await Promise.all([
+            this.prisma.certification.findMany({
+                skip,
+                take: limit,
+                include: {
+                    apprenant: { include: { utilisateur: true } },
+                    formation: {
+                        include: {
+                            professeur: {
+                                include: { utilisateur: true }
+                            }
+                        }
+                    }
+                },
+                orderBy: { id: 'desc' }
+            }),
+            this.prisma.certification.count()
+        ]);
+        return { data: certs, total, page, limit };
+    }
+    async findByProfessorId(professeurId, page = 1, limit = 100) {
+        const skip = (page - 1) * limit;
+        const whereClause = {
+            formation: {
+                professeurId
+            }
+        };
+        const [certs, total] = await Promise.all([
+            this.prisma.certification.findMany({
+                where: whereClause,
+                skip,
+                take: limit,
+                include: {
+                    apprenant: { include: { utilisateur: true } },
+                    formation: {
+                        include: {
+                            professeur: {
+                                include: { utilisateur: true }
+                            }
+                        }
+                    }
+                },
+                orderBy: { id: 'desc' }
+            }),
+            this.prisma.certification.count({ where: whereClause })
+        ]);
+        return { data: certs, total, page, limit };
+    }
     async findByApprenantAndFormation(apprenantId, formationId) {
         return await this.prisma.certification.findFirst({
             where: { apprenantId, formationId }

@@ -9,6 +9,36 @@ const client_1 = require("@prisma/client");
 const CertificationValidator_1 = require("../validators/CertificationValidator");
 const certificationService = new CertificationService_1.CertificationService();
 class CertificationController {
+    static async getAdminCertifications(req, res) {
+        try {
+            const role = req.user?.role;
+            if (role !== client_1.Role.ADMIN) {
+                return formateReponse_1.FormaterResponse.failed(res, "Accès refusé", codeError_1.HttpCode.FORBIDDEN);
+            }
+            const certifications = await certificationService.getAllCertificationsWithRelations();
+            return formateReponse_1.FormaterResponse.success(res, certifications, "Certifications globales récupérées avec succès", codeError_1.HttpCode.OK);
+        }
+        catch (error) {
+            return formateReponse_1.FormaterResponse.failed(res, error.message || "Erreur lors de la récupération des certifications", codeError_1.HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+    static async getProfessorCertifications(req, res) {
+        try {
+            const role = req.user?.role;
+            const professeurId = req.user?.professeurId;
+            if (role !== client_1.Role.PROF) {
+                return formateReponse_1.FormaterResponse.failed(res, "Accès refusé", codeError_1.HttpCode.FORBIDDEN);
+            }
+            if (!professeurId) {
+                return formateReponse_1.FormaterResponse.failed(res, "Professeur introuvable", codeError_1.HttpCode.NOT_FOUND);
+            }
+            const certifications = await certificationService.getCertificationsByProfessorId(Number(professeurId));
+            return formateReponse_1.FormaterResponse.success(res, certifications, "Certifications du professeur récupérées avec succès", codeError_1.HttpCode.OK);
+        }
+        catch (error) {
+            return formateReponse_1.FormaterResponse.failed(res, error.message || "Erreur lors de la récupération des certifications", codeError_1.HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
     static async getAllCertifications(req, res, next) {
         try {
             const userId = req.user?.id;

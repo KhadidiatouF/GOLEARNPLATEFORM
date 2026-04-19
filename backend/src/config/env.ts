@@ -10,7 +10,9 @@ export const dotenvSchema = z.object({
     EMAIL_USER: z.string().email().optional(),
     EMAIL_PASS: z.string().min(1).optional(),
     EMAIL_FROM: z.string().optional(),
-    FRONTEND_URL: z.string().url().default("http://localhost:5173")
+    FRONTEND_URL: z.string().url().default("http://localhost:5173"),
+    OPENAI_API_KEY: z.string().min(1).optional(),
+    OPENAI_MODEL: z.string().min(1).optional()
 })
 
 export const config = dotenvSchema.parse(process.env)

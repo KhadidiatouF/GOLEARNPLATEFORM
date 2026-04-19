@@ -14,6 +14,8 @@ export declare const dotenvSchema: z.ZodObject<{
     EMAIL_PASS: z.ZodOptional<z.ZodString>;
     EMAIL_FROM: z.ZodOptional<z.ZodString>;
     FRONTEND_URL: z.ZodDefault<z.ZodString>;
+    OPENAI_API_KEY: z.ZodOptional<z.ZodString>;
+    OPENAI_MODEL: z.ZodOptional<z.ZodString>;
 }, z.core.$strip>;
 export declare const config: {
     NODE_ENV: "developpement" | "production" | "test";
@@ -25,5 +27,7 @@ export declare const config: {
     EMAIL_USER?: string | undefined;
     EMAIL_PASS?: string | undefined;
     EMAIL_FROM?: string | undefined;
+    OPENAI_API_KEY?: string | undefined;
+    OPENAI_MODEL?: string | undefined;
 };
 //# sourceMappingURL=env.d.ts.map

@@ -23,6 +23,34 @@ export const apiCertif = {
     }
   },
 
+  getAdminCertifications: async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/certifications/admin/all`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error("Erreur lors du fetch des certifications admin");
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur lors du fetch des certifications admin:', error);
+      throw error;
+    }
+  },
+
+  getProfessorCertifications: async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/certifications/professeur/mine`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error("Erreur lors du fetch des certifications du professeur");
+      return await response.json();
+    } catch (error) {
+      console.error('Erreur lors du fetch des certifications du professeur:', error);
+      throw error;
+    }
+  },
+
   getOneCertification: async (id: number) => {
     try {
       const response = await fetch(`${BASE_URL}/certifications/${id}`, {

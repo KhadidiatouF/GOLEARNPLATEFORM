@@ -15,6 +15,14 @@ export class CertificationService {
         return this.certificationRepo.findAll(1, 100, apprenantId);
     }
 
+    getAllCertificationsWithRelations() {
+        return this.certificationRepo.findAllWithRelations(1, 100);
+    }
+
+    getCertificationsByProfessorId(professeurId: number) {
+        return this.certificationRepo.findByProfessorId(professeurId, 1, 100);
+    }
+
     getOneCertification(id: number) {
         return this.certificationRepo.findById(id);
     }

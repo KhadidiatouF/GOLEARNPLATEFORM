@@ -2,11 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.QuizController = void 0;
 const QuizService_1 = require("../services/QuizService");
+const QuizCoachService_1 = require("../services/QuizCoachService");
 const formateReponse_1 = require("../middlewares/formateReponse");
 const codeError_1 = require("../enums/codeError");
 const zod_1 = require("zod");
 const QuizValidator_1 = require("../validators/QuizValidator");
 const quizService = new QuizService_1.QuizService();
+const quizCoachService = new QuizCoachService_1.QuizCoachService();
 class QuizController {
     static async getAllQuizzes(req, res, next) {
         try {
@@ -145,6 +147,29 @@ class QuizController {
         }
         catch (error) {
             return formateReponse_1.FormaterResponse.failed(res, error.message || "Erreur lors de la récupération du résumé", codeError_1.HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+    static async getCoachFeedback(req, res) {
+        try {
+            const { questions, score, requiredScore, attemptCount, formationTitle, sessionTitle } = req.body;
+            if (!Array.isArray(questions) || questions.length === 0) {
+                return formateReponse_1.FormaterResponse.failed(res, "Les questions du quiz sont requises", codeError_1.HttpCode.BAD_REQUEST);
+            }
+            if (typeof score !== "number" || typeof requiredScore !== "number" || typeof attemptCount !== "number") {
+                return formateReponse_1.FormaterResponse.failed(res, "Le score, le seuil requis et le numero de tentative sont requis", codeError_1.HttpCode.BAD_REQUEST);
+            }
+            const feedback = await quizCoachService.generateFeedback({
+                formationTitle,
+                sessionTitle,
+                score,
+                requiredScore,
+                attemptCount,
+                questions
+            });
+            return formateReponse_1.FormaterResponse.success(res, feedback, `${feedback.coachName} a prepare un accompagnement pour cette session`, codeError_1.HttpCode.OK);
+        }
+        catch (error) {
+            return formateReponse_1.FormaterResponse.failed(res, error.message || "Impossible de generer l'accompagnement du professeur IA", codeError_1.HttpCode.INTERNAL_SERVER_ERROR);
         }
     }
 }

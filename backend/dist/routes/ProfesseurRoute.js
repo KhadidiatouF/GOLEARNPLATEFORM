@@ -11,6 +11,7 @@ router.get("/demandes", auth_1.authenticate, (0, roleMiddlewares_1.roleMiddlewar
 router.get("/demandes/en-attente", auth_1.authenticate, (0, roleMiddlewares_1.roleMiddleware)([client_1.Role.ADMIN]), ProfesseurController_1.ProfessController.getDemandesEnAttente);
 router.put("/demandes/:id/valider", auth_1.authenticate, (0, roleMiddlewares_1.roleMiddleware)([client_1.Role.ADMIN]), ProfesseurController_1.ProfessController.validerDemandeProfesseur);
 router.put("/demandes/:id/rejeter", auth_1.authenticate, (0, roleMiddlewares_1.roleMiddleware)([client_1.Role.ADMIN]), ProfesseurController_1.ProfessController.rejeterDemandeProfesseur);
+router.get("/revenus/historique", auth_1.authenticate, (0, roleMiddlewares_1.roleMiddleware)([client_1.Role.PROF]), ProfesseurController_1.ProfessController.getHistoriqueRevenus);
 router.get("/", auth_1.authenticate, ProfesseurController_1.ProfessController.getAllProfesseurs);
 router.get("/:id", auth_1.authenticate, ProfesseurController_1.ProfessController.getOneProfesseur);
 router.post("/", auth_1.authenticate, ProfesseurController_1.ProfessController.createProfesseur);

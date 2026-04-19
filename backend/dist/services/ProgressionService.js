@@ -4,6 +4,9 @@ exports.ProgressionService = void 0;
 const ProgressionRepo_1 = require("../repository/ProgressionRepo");
 class ProgressionService {
     progressionRepo = new ProgressionRepo_1.ProgressionRepo();
+    countTotalChapters(progression) {
+        return progression?.apprenantFormation?.formation?.sessions?.reduce((total, session) => total + (session.chapitres?.length || 0), 0) || 0;
+    }
     // Créer une progression pour une nouvelle inscription
     async createProgression(apprenantFormationId) {
         return await this.progressionRepo.createForApprenantFormation(apprenantFormationId);
@@ -14,12 +17,16 @@ class ProgressionService {
         if (!progression) {
             return null;
         }
-        // Calculer le pourcentage
         const completedCount = progression.chapitresCompletes?.length || 0;
+        const totalChapters = this.countTotalChapters(progression);
+        const percentage = totalChapters > 0
+            ? Math.round((completedCount / totalChapters) * 100)
+            : 0;
         return {
             ...progression,
             completedChapters: completedCount,
-            percentage: 0
+            totalChapters,
+            percentage
         };
     }
     // Marquer un chapitre comme complété

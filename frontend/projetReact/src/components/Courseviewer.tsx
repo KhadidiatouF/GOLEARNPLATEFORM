@@ -10,6 +10,11 @@ interface VideoContentProps { content: { videoUrl: string; description?: string;
 interface PdfContentProps { content: { pdfUrl: string; description?: string; body?: string }; title: string; onContentViewed?: () => void; }
 interface QuizQuestion { id: number; question: string; options: string[]; correct: number; }
 interface QuizContentProps { content: { questions: QuizQuestion[] }; onSuccess?: () => void; }
+interface QuizCoachFeedback {
+  coachName: string;
+  message: string;
+  usedAI: boolean;
+}
 
 interface FinalQuizResponse {
   data?: {
@@ -23,6 +28,8 @@ interface SessionProgress {
   chaptersCompleted: boolean[];
   quizPassed: boolean;
   quizScore: number | null;
+  quizAttempts: number;
+  coachFeedback?: QuizCoachFeedback | null;
 }
 
 interface FinalQuizState {
@@ -401,15 +408,31 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
 
 interface QuizWrapperProps {
   content: { questions: QuizQuestion[] };
-  onSubmit: (score: number) => void;
+  onSubmit: (result: { score: number; passed: boolean; attemptCount: number; coachFeedback?: QuizCoachFeedback | null }) => void;
   onSuccess?: (score: number) => void;
   requiredScore?: number;
   variant?: "session" | "final";
+  attemptCount?: number;
+  coachFeedback?: QuizCoachFeedback | null;
+  formationTitle?: string;
+  sessionTitle?: string;
 }
 
-function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60, variant = "session" }: QuizWrapperProps) {
+function QuizWrapper({
+  content,
+  onSubmit,
+  onSuccess,
+  requiredScore = 60,
+  variant = "session",
+  attemptCount = 0,
+  coachFeedback: persistedCoachFeedback = null,
+  formationTitle,
+  sessionTitle
+}: QuizWrapperProps) {
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [coachFeedback, setCoachFeedback] = useState<QuizCoachFeedback | null>(persistedCoachFeedback);
+  const [coachLoading, setCoachLoading] = useState(false);
   const computedCorrectCount = content.questions.filter((q) => answers[q.id] === q.correct).length;
   const correctCount = submitted ? computedCorrectCount : 0;
   const totalQuestions = content.questions.length;
@@ -432,10 +455,57 @@ function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60, variant
         retryButton: "bg-orange-500 hover:bg-orange-600"
       };
 
-  const handleSubmit = () => {
+  useEffect(() => {
+    setCoachFeedback(persistedCoachFeedback);
+  }, [persistedCoachFeedback]);
+
+  const handleSubmit = async () => {
     const nextPercentage = Math.round((computedCorrectCount / totalQuestions) * 100);
+    const nextPassed = nextPercentage >= requiredScore;
+    const nextAttemptCount = nextPassed ? 0 : attemptCount + 1;
+    let nextCoachFeedback = persistedCoachFeedback;
+
+    if (!nextPassed && !isFinalQuiz && nextAttemptCount >= 2) {
+      setCoachLoading(true);
+      try {
+        const response = await apiQuiz.getCoachFeedback({
+          formationTitle,
+          sessionTitle,
+          score: nextPercentage,
+          requiredScore,
+          attemptCount: nextAttemptCount,
+          questions: content.questions.map((question) => ({
+            question: question.question,
+            options: question.options,
+            selectedIndex: answers[question.id],
+            correctIndex: question.correct
+          }))
+        });
+
+        nextCoachFeedback = response?.data || null;
+      } catch (error) {
+        console.error("Erreur récupération accompagnement IA:", error);
+        nextCoachFeedback = {
+          coachName: "Professeur Awa",
+          usedAI: false,
+          message: "Je t'accompagne pour cette session. Relis les notions que tu confonds encore, prends le temps de comparer les concepts proches, puis retente le quiz avec une attention particuliere sur les questions qui t'ont pose probleme."
+        };
+      } finally {
+        setCoachLoading(false);
+      }
+
+      setCoachFeedback(nextCoachFeedback);
+    } else if (nextPassed) {
+      setCoachFeedback(null);
+    }
+
     setSubmitted(true);
-    onSubmit(nextPercentage);
+    onSubmit({
+      score: nextPercentage,
+      passed: nextPassed,
+      attemptCount: nextAttemptCount,
+      coachFeedback: nextCoachFeedback
+    });
   };
 
   if (submitted) {
@@ -464,6 +534,32 @@ function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60, variant
           <p className="text-3xl font-bold text-gray-900">{correctCount}/{totalQuestions}</p>
           <p className="text-gray-500 mt-1">bonnes réponses</p>
         </div>
+
+        {!passed && coachLoading && (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">Professeur Awa prepare votre accompagnement...</p>
+            <p className="mt-1 text-sm text-amber-800">Analyse des erreurs en cours pour vous aider avant la prochaine tentative.</p>
+          </div>
+        )}
+
+        {!passed && coachFeedback && (
+          <div className="mb-4 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
+                IA
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-indigo-900">{coachFeedback.coachName}</p>
+                <p className="text-xs text-indigo-700">
+                  {coachFeedback.usedAI ? "Accompagnement personnalise du professeur IA" : "Accompagnement pedagogique de secours"}
+                </p>
+              </div>
+            </div>
+            <div className="prose prose-sm max-w-none text-indigo-950">
+              <ReactMarkdown>{coachFeedback.message}</ReactMarkdown>
+            </div>
+          </div>
+        )}
 
         {passed ? (
           <button
@@ -499,7 +595,7 @@ function QuizWrapper({ content, onSubmit, onSuccess, requiredScore = 60, variant
           </div>
         </div>
       ))}
-      <button onClick={handleSubmit} disabled={Object.keys(answers).length < totalQuestions}
+      <button onClick={handleSubmit} disabled={Object.keys(answers).length < totalQuestions || coachLoading}
         className={`w-full py-3 text-white rounded-xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm ${accentClasses.submit}`}>
         Soumettre ({requiredScore}% requis)
       </button>
@@ -903,14 +999,19 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
     }
   };
 
-  const handleSessionQuizSubmit = (score: number) => {
+  const handleSessionQuizSubmit = (result: { score: number; passed: boolean; attemptCount: number; coachFeedback?: QuizCoachFeedback | null }) => {
     if (!activeSession) return;
     const sessionId = activeSession.id;
-    const passed = score >= 60;
 
     setSessionProgress((prev: Record<number, SessionProgress>) => ({
       ...prev,
-      [sessionId]: { ...prev[sessionId], quizPassed: passed, quizScore: score }
+      [sessionId]: {
+        ...prev[sessionId],
+        quizPassed: result.passed,
+        quizScore: result.score,
+        quizAttempts: result.attemptCount,
+        coachFeedback: result.passed ? null : (result.coachFeedback || prev[sessionId]?.coachFeedback || null)
+      }
     }));
   };
 
@@ -933,8 +1034,9 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
     localStorage.setItem("certifications", JSON.stringify([nextCertification, ...storedCertifications]));
   };
 
-  const handleFinalQuizSubmit = async (score: number) => {
-    const passed = score >= 70;
+  const handleFinalQuizSubmit = async (result: { score: number; passed: boolean; attemptCount: number; coachFeedback?: QuizCoachFeedback | null }) => {
+    const score = result.score;
+    const passed = result.passed;
     setFinalQuizState(prev => ({
       ...prev,
       showFinalQuiz: true,
@@ -987,7 +1089,9 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
               currentChapterIndex: 0,
               chaptersCompleted: new Array(chapters.length).fill(false),
               quizPassed: false,
-              quizScore: null
+              quizScore: null,
+              quizAttempts: 0,
+              coachFeedback: null
             };
             hasChanges = true;
           }
@@ -1063,13 +1167,19 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
                   [activeSession.id]: {
                     ...sessionProgress[activeSession.id],
                     quizPassed: score >= 60,
-                    quizScore: score
+                    quizScore: score,
+                    quizAttempts: 0,
+                    coachFeedback: null
                   }
                 };
                 setShowSessionQuiz(false);
                 handleNextSession(nextProgress);
               }}
               requiredScore={60}
+              attemptCount={sessionProgress[activeSession.id]?.quizAttempts || 0}
+              coachFeedback={sessionProgress[activeSession.id]?.coachFeedback || null}
+              formationTitle={formation.title}
+              sessionTitle={activeSession.title}
             />
           </div>
         );

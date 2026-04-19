@@ -1,11 +1,14 @@
 import type { NextFunction, Request, Response } from "express";
 import { QuizService } from "../services/QuizService";
+import { QuizCoachService } from "../services/QuizCoachService";
 import { FormaterResponse } from "../middlewares/formateReponse";
 import { HttpCode } from "../enums/codeError";
 import { ZodError } from "zod";
 import { quizSchema } from "../validators/QuizValidator";
+import type { AuthRequest } from "../middlewares/auth";
 
 const quizService = new QuizService();
+const quizCoachService = new QuizCoachService();
 
 export class QuizController {
     static async getAllQuizzes(req: Request, res: Response, next: NextFunction) {
@@ -149,6 +152,42 @@ export class QuizController {
             FormaterResponse.success(res, summary, "Résumé des quiz récupéré", HttpCode.OK);
         } catch (error: any) {
             return FormaterResponse.failed(res, error.message || "Erreur lors de la récupération du résumé", HttpCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    static async getCoachFeedback(req: AuthRequest, res: Response) {
+        try {
+            const { questions, score, requiredScore, attemptCount, formationTitle, sessionTitle } = req.body;
+
+            if (!Array.isArray(questions) || questions.length === 0) {
+                return FormaterResponse.failed(res, "Les questions du quiz sont requises", HttpCode.BAD_REQUEST);
+            }
+
+            if (typeof score !== "number" || typeof requiredScore !== "number" || typeof attemptCount !== "number") {
+                return FormaterResponse.failed(res, "Le score, le seuil requis et le numero de tentative sont requis", HttpCode.BAD_REQUEST);
+            }
+
+            const feedback = await quizCoachService.generateFeedback({
+                formationTitle,
+                sessionTitle,
+                score,
+                requiredScore,
+                attemptCount,
+                questions
+            });
+
+            return FormaterResponse.success(
+                res,
+                feedback,
+                `${feedback.coachName} a prepare un accompagnement pour cette session`,
+                HttpCode.OK
+            );
+        } catch (error: any) {
+            return FormaterResponse.failed(
+                res,
+                error.message || "Impossible de generer l'accompagnement du professeur IA",
+                HttpCode.INTERNAL_SERVER_ERROR
+            );
         }
     }
 }

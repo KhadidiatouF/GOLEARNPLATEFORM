@@ -96,6 +96,21 @@ export const apiQuiz = {
     }
   },
 
+  getCoachFeedback: async (payload: Record<string, unknown>) => {
+    try {
+      const response = await fetch(`${BASE_URL}/quiz/coach-feedback`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error("Erreur lors de la génération de l'aide IA");
+      return await response.json();
+    } catch (error) {
+      console.error("Erreur lors de la génération de l'aide IA:", error);
+      throw error;
+    }
+  },
+
   checkCanTakeFinalQuiz: async (formationId: number) => {
     try {
       const response = await fetch(`${BASE_URL}/quiz/formation/${formationId}/can-take-final`, {

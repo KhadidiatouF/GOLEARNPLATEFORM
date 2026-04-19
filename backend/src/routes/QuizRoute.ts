@@ -5,6 +5,7 @@ import { authenticate } from "../middlewares/auth";
 const router = Router();
 
 router.get("/", authenticate, QuizController.getAllQuizzes);
+router.post("/coach-feedback", authenticate, QuizController.getCoachFeedback);
 router.get("/:id", authenticate, QuizController.getOneQuiz);
 router.post("/", authenticate, QuizController.createQuiz);
 router.put("/:id", authenticate, QuizController.updateQuiz);

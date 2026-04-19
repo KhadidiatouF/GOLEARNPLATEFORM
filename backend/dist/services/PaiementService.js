@@ -48,6 +48,9 @@ class PaiementService {
         }
         return client_1.StatutPaiement.EN_ATTENTE;
     }
+    isSimulatedInstantPayment(moyenPaiement) {
+        return moyenPaiement === client_1.MoyenPaiement.WAVE || moyenPaiement === client_1.MoyenPaiement.OM;
+    }
     async createPaiement(data, utilisateurId) {
         const apprenant = await this.prisma.apprenant.findUnique({
             where: { utilisateurId }
@@ -64,6 +67,7 @@ class PaiementService {
         if (formation.typeCours === "GRATUIT" || formation.prix === 0) {
             throw new Error("Cette formation ne necessite pas de paiement.");
         }
+        const moyenPaiement = data.moyenPaiement;
         let apprenantFormation = await this.prisma.apprenantFormation.findUnique({
             where: {
                 apprenantId_formationId: {
@@ -90,19 +94,42 @@ class PaiementService {
             }
         });
         if (existingPendingPayment) {
+            if (this.isSimulatedInstantPayment(moyenPaiement)) {
+                await this.confirmPaiement({
+                    paiementId: existingPendingPayment.id,
+                    reference: existingPendingPayment.reference,
+                    transactionId: existingPendingPayment.transactionId || `SIM-${moyenPaiement}-${Date.now()}`,
+                    status: "SUCCESS",
+                    source: "SIMULATED_CHECKOUT",
+                    success: true
+                });
+                return this.paiementRepo.findById(existingPendingPayment.id);
+            }
             return existingPendingPayment;
         }
         const reference = data.reference || `PAY-${formation.id}-${apprenant.id}-${Date.now()}`;
         const pendingAmount = typeof data.montant === "number" ? data.montant : formation.prix;
-        return await this.paiementRepo.create({
+        const paiement = await this.paiementRepo.create({
             montant: pendingAmount,
-            moyenPaiement: data.moyenPaiement,
+            moyenPaiement,
             statut: client_1.StatutPaiement.EN_ATTENTE,
             reference,
             apprenantFormation: {
                 connect: { id: apprenantFormation.id }
             }
         });
+        if (this.isSimulatedInstantPayment(moyenPaiement)) {
+            await this.confirmPaiement({
+                paiementId: paiement.id,
+                reference: paiement.reference,
+                transactionId: `SIM-${moyenPaiement}-${Date.now()}`,
+                status: "SUCCESS",
+                source: "SIMULATED_CHECKOUT",
+                success: true
+            });
+            return this.paiementRepo.findById(paiement.id);
+        }
+        return paiement;
     }
     async confirmPaiement(data) {
         const paymentReference = data?.reference || data?.paymentReference || data?.externalReference;

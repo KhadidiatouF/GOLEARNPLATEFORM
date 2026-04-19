@@ -39,10 +39,10 @@ class MailService {
               <td align="center">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 18px 40px rgba(76,29,149,0.12);">
                   <tr>
-                    <td style="padding:32px;background:linear-gradient(135deg,#5b21b6 0%,#7c3aed 65%,#c084fc 100%);text-align:left;">
-                      <div style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#fef3c7;font-weight:700;margin-bottom:10px;">GOLEARN</div>
-                      <h1 style="margin:0;font-size:28px;line-height:1.2;color:#ffffff;">Votre compte professeur est active</h1>
-                      <p style="margin:12px 0 0;color:rgba(255,255,255,0.88);font-size:15px;line-height:1.6;">Votre demande a ete validee par l'administration. Vous pouvez maintenant acceder a votre espace formateur.</p>
+                    <td style="padding:32px;background-color:#7c3aed;text-align:left;">
+                      <div style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#ffffff;font-weight:700;margin-bottom:10px;">GOLEARN</div>
+                      <h1 style="margin:0;font-size:28px;line-height:1.2;color:#ffffff;">Votre compte professeur est actif</h1>
+                      <p style="margin:12px 0 0;color:rgba(255,255,255,0.9);font-size:15px;line-height:1.6;">Votre demande a été validée par l'administration. Vous pouvez maintenant accéder à votre espace formateur.</p>
                     </td>
                   </tr>
                   <tr>

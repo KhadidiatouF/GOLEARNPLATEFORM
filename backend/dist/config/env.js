@@ -15,7 +15,9 @@ exports.dotenvSchema = zod_1.default.object({
     EMAIL_USER: zod_1.default.string().email().optional(),
     EMAIL_PASS: zod_1.default.string().min(1).optional(),
     EMAIL_FROM: zod_1.default.string().optional(),
-    FRONTEND_URL: zod_1.default.string().url().default("http://localhost:5173")
+    FRONTEND_URL: zod_1.default.string().url().default("http://localhost:5173"),
+    OPENAI_API_KEY: zod_1.default.string().min(1).optional(),
+    OPENAI_MODEL: zod_1.default.string().min(1).optional()
 });
 exports.config = exports.dotenvSchema.parse(process.env);
 //# sourceMappingURL=env.js.map
