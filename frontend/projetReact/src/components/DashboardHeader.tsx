@@ -1,9 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getDashboardPreferences, type ThemeColor } from '../utils/dashboardPreferences';
 
 interface DashboardHeaderProps {
-  color: 'purple';
+  color: ThemeColor;
 }
 
 const colorMap = {
@@ -36,8 +37,32 @@ const roleLabels = {
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const colors = colorMap[color];
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [themeColor, setThemeColor] = React.useState<ThemeColor>(color);
+  const [profilePhoto, setProfilePhoto] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!user?.role) {
+      setThemeColor(color);
+      setProfilePhoto(null);
+      return;
+    }
+
+    const syncPreferences = () => {
+      const preferences = getDashboardPreferences(user.role);
+      setThemeColor(preferences.themeColor || color);
+      setProfilePhoto(preferences.profilePhoto);
+    };
+
+    syncPreferences();
+    window.addEventListener('dashboard-preferences-updated', syncPreferences);
+
+    return () => {
+      window.removeEventListener('dashboard-preferences-updated', syncPreferences);
+    };
+  }, [color, user?.role]);
+
+  const colors = colorMap[themeColor];
 
   const handleLogout = () => {
     logout();
@@ -70,11 +95,15 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
         </button>
 
         <div className="hidden lg:flex items-center gap-3">
-          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-            <span className="font-semibold text-gray-700">
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
-            </span>
-          </div>
+          {profilePhoto ? (
+            <img src={profilePhoto} alt="Profil" className="w-10 h-10 rounded-full object-cover border border-gray-200" />
+          ) : (
+            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+              <span className="font-semibold text-gray-700">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+          )}
           <div className="flex flex-col">
             <span className="text-sm font-medium text-gray-800">
               {user?.name}
@@ -95,11 +124,15 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
         {menuOpen && (
           <div className="absolute top-full right-4 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[240px] z-50">
             <div className="flex items-center gap-3 pb-4 border-b border-gray-100 mb-3">
-              <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                <span className="font-semibold text-gray-700 text-lg">
-                  {user?.name?.charAt(0).toUpperCase() || 'U'}
-                </span>
-              </div>
+              {profilePhoto ? (
+                <img src={profilePhoto} alt="Profil" className="w-12 h-12 rounded-full object-cover border border-gray-200" />
+              ) : (
+                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
+                  <span className="font-semibold text-gray-700 text-lg">
+                    {user?.name?.charAt(0).toUpperCase() || 'U'}
+                  </span>
+                </div>
+              )}
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-gray-800">
                   {user?.name}

@@ -9,6 +9,7 @@ import { Clock, Calendar, BarChart3, TrendingDown, PieChart, Activity, Plus, Tra
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import NotificationDialog from '../components/NotificationDialog';
+import DashboardSettingsPanel from '../components/DashboardSettingsPanel';
 import { Chart as ChartJS,CategoryScale,LinearScale,BarElement,Title,Tooltip, Legend, ArcElement, PointElement, LineElement, RadialLinearScale, Filler} from 'chart.js';
 import { Bar, Doughnut, Line, PolarArea } from 'react-chartjs-2';
 
@@ -243,6 +244,7 @@ export default function AdminDashboard() {
     }
   });
   const [statisticsLoading, setStatisticsLoading] = useState(true);
+  const totalDemandesCount = teacherRequests.length;
 
   // Données complètes à exporter (toutes les statistiques des graphiques)
   const exportData = {
@@ -291,7 +293,7 @@ export default function AdminDashboard() {
     rows.push(['Utilisateurs', exportData.general.users.toString()]);
     rows.push(['Formations actives', exportData.general.formations.toString()]);
     rows.push(['Professeurs', exportData.general.professors.toString()]);
-    rows.push(['Sessions ce mois', exportData.general.sessions.toString()]);
+    rows.push(['Total demandes', totalDemandesCount.toString()]);
     rows.push(['']);
     
     // Section: Inscriptions par mois
@@ -345,7 +347,7 @@ export default function AdminDashboard() {
     rows.push(['Utilisateurs', exportData.general.users.toString()]);
     rows.push(['Formations actives', exportData.general.formations.toString()]);
     rows.push(['Professeurs', exportData.general.professors.toString()]);
-    rows.push(['Sessions ce mois', exportData.general.sessions.toString()]);
+    rows.push(['Total demandes', totalDemandesCount.toString()]);
     rows.push(['']);
     
     // Section: Inscriptions par mois
@@ -766,8 +768,8 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                     <Calendar className="w-6 h-6 text-purple-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-purple-700">{statisticsLoading ? '...' : statistics.general.sessions.toLocaleString()}</h3>
-                <p className="text-purple-600 font-medium">Sessions ce mois</p>
+                <h3 className="text-3xl font-bold text-purple-700">{teacherRequestsLoading ? '...' : totalDemandesCount.toLocaleString()}</h3>
+                <p className="text-purple-600 font-medium">Total demandes</p>
               </div>
             </div>
 
@@ -1623,6 +1625,16 @@ const getFirstDayOfMonth = (year: number, month: number) => {
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold mb-4">Paramètres du système</h2>
             <div className="space-y-6">
+              <DashboardSettingsPanel
+                role="admin"
+                roleLabel="Administrateur"
+                stats={[
+                  { label: 'Utilisateurs', value: totalUsers.toString() },
+                  { label: 'Formations', value: statistics.general.formations.toString() },
+                  { label: 'Total demandes', value: totalDemandesCount.toString() },
+                ]}
+                securityText="Cet espace contrôle l’administration de la plateforme. Gardez vos notifications critiques actives et utilisez une identité visuelle claire pour distinguer rapidement votre interface de supervision."
+              />
               <div>
                 <h3 className="font-medium mb-2">Général</h3>
                 <div className="space-y-2">

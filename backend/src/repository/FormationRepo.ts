@@ -62,7 +62,8 @@ export class FormationRepo implements IRepository<Formation> {
             where: { professeurId },
             include: { 
                 professeur: { include: { utilisateur: true } },
-                sessions: true
+                sessions: true,
+                apprenants: true
             }
         });
     }

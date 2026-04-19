@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import DashboardHeader from '../components/DashboardHeader';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import DashboardSettingsPanel from '../components/DashboardSettingsPanel';
 import { apiFormation } from '../api/apiFormation';
 import { apiProgression } from '../api/apiProgression';
 import { apiUsers } from '../api/apiUsers';
@@ -69,10 +70,11 @@ interface Course {
   image?: string;
   typeCours: 'PAYANT' | 'GRATUIT';
   students: number;
-  modules: number;
+  sessionsCount: number;
   status: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
   color: string;
   professeurId: number;
+  dateCreation?: string;
 }
 
 interface RevenueHistoryItem {
@@ -100,6 +102,7 @@ interface FormationFromAPI {
   // Le champ "statut" peut aussi être envoyé par l'API
   statut?: 'EN_ATTENTE' | 'VALIDEE' | 'REJETEE';
   professeurId: number;
+  dateCreation?: string;
   sessions?: { id: number }[];
   apprenants?: { id: number }[];
 }
@@ -170,6 +173,7 @@ export default function ProfDashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [courseToDelete, setCourseToDelete] = useState<number | null>(null);
+  const [editingCourseId, setEditingCourseId] = useState<number | null>(null);
   const [solde, setSolde] = useState<number>(0);
   const [revenueHistory, setRevenueHistory] = useState<RevenueHistoryItem[]>([]);
   const [revenueHistoryLoading, setRevenueHistoryLoading] = useState(true);
@@ -208,6 +212,7 @@ export default function ProfDashboard() {
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
+    const isEditingCourse = editingCourseId !== null;
     
     if (!newCourse.titre.trim()) {
       errors.titre = 'Le titre est requis';
@@ -235,9 +240,9 @@ export default function ProfDashboard() {
     }
     
     // Validation des sessions (au moins une session requise)
-    if (!newCourse.sessions || newCourse.sessions.length === 0) {
+    if (!isEditingCourse && (!newCourse.sessions || newCourse.sessions.length === 0)) {
       errors.sessions = 'Au moins une session est requise';
-    } else {
+    } else if (!isEditingCourse) {
       newCourse.sessions.forEach((session, index) => {
         if (!session.titre.trim()) {
           errors[`session_${index}`] = `Le titre de la session ${index + 1} est requis`;
@@ -249,7 +254,23 @@ export default function ProfDashboard() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleAddCourse = async () => {
+  const resetCourseForm = () => {
+    setEditingCourseId(null);
+    setNewCourse({
+      titre: '',
+      description: '',
+      prix: 0,
+      categorie: '',
+      niveau: '',
+      typeCours: 'GRATUIT',
+      image: '',
+      sessions: [{ titre: '', chapitres: [], quiz: undefined }]
+    });
+    setFormErrors({});
+    setSubmitStatus({ type: null, message: '' });
+  };
+
+  const handleSaveCourse = async () => {
     // Réinitialiser les erreurs et le statut
     setFormErrors({});
     setSubmitStatus({ type: null, message: '' });
@@ -268,8 +289,7 @@ export default function ProfDashboard() {
         return;
       }
 
-      // Préparer les données conformes au backend (création complète avec sessions)
-      const formationData = {
+      const baseFormationData = {
         titre: newCourse.titre.trim(),
         description: newCourse.description.trim(),
         prix: newCourse.typeCours === 'GRATUIT' ? 0 : (Number(newCourse.prix) || 0),
@@ -277,77 +297,113 @@ export default function ProfDashboard() {
         niveau: newCourse.niveau,
         typeCours: newCourse.typeCours,
         image: newCourse.image?.trim() || undefined,
-        professeurId: Number(professeurId),
-        sessions: newCourse.sessions.filter(s => s.titre.trim()).map(session => ({
-          titre: session.titre,
-          contenu: session.contenu || '',
-          duree: session.duree || '',
-          chapitres: session.chapitres.filter(c => c.titre.trim()).map(c => ({
-            titre: c.titre,
-            contenu: c.contenu,
-            duree: c.duree,
-            typeContenu: c.typeContenu || 'VIDEO'
-          })),
-          quiz: session.quiz && session.quiz.questions.length > 0 ? {
-            questions: session.quiz.questions.filter(q => q.contenu.trim()).map(q => ({
-              contenu: q.contenu,
-              reponses: q.reponses.filter(r => r.contenu.trim())
-            }))
-          } : undefined
-        }))
+        professeurId: Number(professeurId)
       };
 
-      // Appeler l'API backend pour création complète
-      const response = await apiFormation.createCompleteFormation(formationData);
-      
-      if (response.status === 201 || response.success) {
-        // Ajouter la formation à l'état local après création réussie
-        const course: Course = {
-          id: response.data?.id || Date.now(),
-          titre: newCourse.titre,
-          description: newCourse.description,
-          prix: formationData.prix,
-          categorie: newCourse.categorie,
-          niveau: newCourse.niveau,
-          typeCours: newCourse.typeCours,
-          image: newCourse.image,
-          students: 0,
-          modules: 0,
-          status: 'EN_ATTENTE',
-          color: 'from-indigo-500 to-indigo-700',
-          professeurId: professeurId
+      if (editingCourseId !== null) {
+        const response = await apiFormation.updateFormation(editingCourseId, baseFormationData);
+        if (response) {
+          setCourses(prevCourses =>
+            prevCourses.map(course =>
+              course.id === editingCourseId
+                ? {
+                    ...course,
+                    ...baseFormationData,
+                    image: newCourse.image || undefined
+                  }
+                : course
+            )
+          );
+          setIsModalOpen(false);
+          resetCourseForm();
+          setSubmitStatus({ type: 'success', message: 'Formation modifiée avec succès.' });
+        }
+      } else {
+        const formationData = {
+          ...baseFormationData,
+          sessions: newCourse.sessions.filter(s => s.titre.trim()).map(session => ({
+            titre: session.titre,
+            contenu: session.contenu || '',
+            duree: session.duree || '',
+            chapitres: session.chapitres.filter(c => c.titre.trim()).map(c => ({
+              titre: c.titre,
+              contenu: c.contenu,
+              duree: c.duree,
+              typeContenu: c.typeContenu || 'VIDEO'
+            })),
+            quiz: session.quiz && session.quiz.questions.length > 0 ? {
+              questions: session.quiz.questions.filter(q => q.contenu.trim()).map(q => ({
+                contenu: q.contenu,
+                reponses: q.reponses.filter(r => r.contenu.trim())
+              }))
+            } : undefined
+          }))
         };
-        setCourses([course, ...courses]);
-        setIsModalOpen(false);
-        setNewCourse({
-          titre: '',
-          description: '',
-          prix: 0,
-          categorie: '',
-          niveau: '',
-          typeCours: 'GRATUIT',
-          image: '',
-          sessions: [{ titre: '', chapitres: [], quiz: undefined }]
-        });
-        setSubmitStatus({ type: 'success', message: 'Formation créée avec succès! En attente de validation.' });
+
+        const response = await apiFormation.createCompleteFormation(formationData);
+        
+        if (response.status === 201 || response.success) {
+          const course: Course = {
+            id: response.data?.id || Date.now(),
+            titre: newCourse.titre,
+            description: newCourse.description,
+            prix: formationData.prix,
+            categorie: newCourse.categorie,
+            niveau: newCourse.niveau,
+            typeCours: newCourse.typeCours,
+            image: newCourse.image,
+            students: 0,
+            sessionsCount: newCourse.sessions.filter(session => session.titre.trim()).length,
+            status: 'EN_ATTENTE',
+            color: 'from-indigo-500 to-indigo-700',
+            professeurId: professeurId
+          };
+          setCourses([course, ...courses]);
+          setIsModalOpen(false);
+          resetCourseForm();
+          setSubmitStatus({ type: 'success', message: 'Formation créée avec succès! En attente de validation.' });
+        }
       }
     } catch (error) {
-      console.error('Erreur lors de la création de la formation:', error);
-      setSubmitStatus({ type: 'error', message: 'Erreur lors de la création de la formation. Veuillez réessayer.' });
+      console.error('Erreur lors de la sauvegarde de la formation:', error);
+      setSubmitStatus({ type: 'error', message: editingCourseId !== null ? 'Erreur lors de la modification de la formation. Veuillez réessayer.' : 'Erreur lors de la création de la formation. Veuillez réessayer.' });
     }
   };
 
-  const handleDeleteCourse = () => {
+  const handleDeleteCourse = async () => {
     if (courseToDelete) {
-      setCourses(courses.filter(c => c.id !== courseToDelete));
-      setCourseToDelete(null);
-      setIsDeleteDialogOpen(false);
+      try {
+        await apiFormation.deleteFormation(courseToDelete);
+        setCourses(courses.filter(c => c.id !== courseToDelete));
+        setCourseToDelete(null);
+        setIsDeleteDialogOpen(false);
+      } catch (error) {
+        console.error('Erreur lors de la suppression de la formation:', error);
+        setSubmitStatus({ type: 'error', message: 'Erreur lors de la suppression de la formation. Veuillez réessayer.' });
+      }
     }
   };
 
   const confirmDelete = (id: number) => {
     setCourseToDelete(id);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleEditCourse = (course: Course) => {
+    setEditingCourseId(course.id);
+    setFormErrors({});
+    setSubmitStatus({ type: null, message: '' });
+    setNewCourse({
+      titre: course.titre,
+      description: course.description,
+      prix: course.prix,
+      categorie: course.categorie,
+      niveau: course.niveau,
+      typeCours: course.typeCours,
+      image: course.image || '',
+      sessions: [{ titre: '', chapitres: [], quiz: undefined }]
+    });
+    setIsModalOpen(true);
   };
 
   // Horloge en temps réel
@@ -404,10 +460,11 @@ export default function ProfDashboard() {
             image: formation.image || undefined,
             typeCours: formation.typeCours,
             students: formation.apprenants?.length || 0,
-            modules: formation.sessions?.length || 0,
+            sessionsCount: formation.sessions?.length || 0,
             status: formation.statut || 'EN_ATTENTE',
             color: 'from-indigo-500 to-indigo-700',
-            professeurId: formation.professeurId
+            professeurId: formation.professeurId,
+            dateCreation: formation.dateCreation
           }));
           console.log('Formations formatées:', formattedCourses);
           setCourses(formattedCourses);
@@ -487,10 +544,32 @@ export default function ProfDashboard() {
   const totalStudentsCount = enrolledApprenants.length > 0 
     ? enrolledApprenants.length 
     : courses.reduce((sum, c) => sum + c.students, 0);
-  // Travaux en attente = formations avec statut 'EN_ATTENTE' ou 'REJETEE'
-  const pendingWorksCount = courses.filter(c => c.status === 'EN_ATTENTE' || c.status === 'REJETEE').length;
   // Formations validées = formations avec statut 'VALIDEE' (statut différent de 'EN_ATTENTE' et 'REJETEE')
   const validatedFormationsCount = courses.filter(c => c.status !== 'EN_ATTENTE' && c.status !== 'REJETEE').length;
+  const learnerProgressItems = enrolledApprenants
+    .map((student, index) => ({
+      id: `${student.apprenant?.id || student.name || 'student'}-${index}`,
+      name: student.apprenant?.name || student.name || 'Apprenant',
+      course:
+        typeof student.formation === 'string'
+          ? student.formation
+          : student.formation?.titre || 'Formation',
+      progress: student.progression?.percentage ?? student.progress ?? 0
+    }))
+    .sort((a, b) => b.progress - a.progress)
+    .slice(0, 2);
+  const recentCourses = [...courses]
+    .sort((a, b) => {
+      const dateA = a.dateCreation ? new Date(a.dateCreation).getTime() : 0;
+      const dateB = b.dateCreation ? new Date(b.dateCreation).getTime() : 0;
+
+      if (dateA !== dateB) {
+        return dateB - dateA;
+      }
+
+      return b.id - a.id;
+    })
+    .slice(0, 2);
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -554,8 +633,8 @@ export default function ProfDashboard() {
                     <Clock className="w-6 h-6 text-orange-600" />
                   </div>
                 </div>
-                <h3 className="text-3xl font-bold text-orange-700">{pendingWorksCount}</h3>
-                <p className="text-orange-600 font-medium">Travaux en attente</p>
+                <h3 className="text-3xl font-bold text-orange-700">{solde.toLocaleString()} XOF</h3>
+                <p className="text-orange-600 font-medium">Revenus générés</p>
               </div>
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <div className="flex justify-center items-center gap-4 mb-4">
@@ -581,11 +660,12 @@ export default function ProfDashboard() {
                     <h3 className="text-base font-semibold text-gray-800">Progression des apprenants</h3>
                   </div>
                   <div className="space-y-3">
-                    {[
-                      { name: 'Marie Dupont', course: 'React Avancé', progress: 85 },
-                      { name: 'Jean Martin', course: 'JavaScript ES6+', progress: 72 },
-                    ].map((student, idx) => (
-                      <div key={idx} className="space-y-1">
+                    {apprenantsLoading ? (
+                      <p className="py-6 text-center text-sm text-gray-500">Chargement des progressions...</p>
+                    ) : learnerProgressItems.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-gray-500">Aucune progression apprenant disponible pour le moment.</p>
+                    ) : learnerProgressItems.map((student) => (
+                      <div key={student.id} className="space-y-1">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-gray-700">{student.name}</span>
                           <span className="text-xs text-gray-500">{student.course}</span>
@@ -610,19 +690,26 @@ export default function ProfDashboard() {
                     <h3 className="text-base font-semibold text-gray-800">Cours ajoutés récemment</h3>
                   </div>
                   <div className="space-y-3">
-                    {[
-                      { title: 'React Avancé', date: '15 Feb 2026', type: 'payant', description: 'Maîtrisez les concepts avancés de React' },
-                      { title: 'JavaScript ES6+', date: '10 Feb 2026', type: 'gratuit', description: 'Apprenez les nouvelles fonctionnalités JavaScript' },
-                    ].map((course, idx) => (
-                      <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                    {recentCourses.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-gray-500">Aucune formation ajoutée pour le moment.</p>
+                    ) : recentCourses.map((course) => (
+                      <div key={course.id} className="p-3 bg-gray-50 rounded-lg">
                         <div className="flex justify-between items-start mb-1">
-                          <h4 className="font-medium text-gray-800">{course.title}</h4>
-                          <span className={`px-2 py-0.5 text-xs rounded-full ${course.type === 'payant' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
-                            {course.type === 'payant' ? 'Payant' : 'Gratuit'}
+                          <h4 className="font-medium text-gray-800">{course.titre}</h4>
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${course.typeCours === 'PAYANT' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                            {course.typeCours === 'PAYANT' ? 'Payant' : 'Gratuit'}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 mb-1">{course.description}</p>
-                        <p className="text-xs text-gray-400">Créé le {course.date}</p>
+                        <p className="text-xs text-gray-500 mb-1 line-clamp-2">{course.description}</p>
+                        <p className="text-xs text-gray-400">
+                          Créé le {course.dateCreation
+                            ? new Date(course.dateCreation).toLocaleDateString('fr-FR', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric'
+                              })
+                            : `#${course.id}`}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -737,41 +824,56 @@ export default function ProfDashboard() {
                   <>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {paginatedCourses.map((course) => (
-                        <div key={course.id} className={`relative overflow-hidden rounded-xl p-5 bg-gradient-to-r ${course.color} text-white shadow-md hover:shadow-lg transition-shadow`}>
-                          <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
-                          
-                          {/* Status badge et boutons */}
-                          <div className="flex justify-between items-start mb-3">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-                              course.status === 'VALIDEE' ? 'bg-green-400 text-green-900' :
-                              course.status === 'EN_ATTENTE' ? 'bg-yellow-400 text-yellow-900' :
-                              'bg-red-400 text-red-900'
+                        <div key={course.id} className="relative overflow-hidden rounded-3xl border border-purple-100 bg-white p-5 shadow-sm ring-1 ring-purple-100/60 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl">
+                          <div className="absolute -right-10 -top-10 h-24 w-24 rounded-full bg-purple-100/70 blur-2xl" />
+                          <div className="absolute inset-x-5 top-16 h-px bg-gradient-to-r from-transparent via-purple-100 to-transparent" />
+
+                          <div className="relative z-10 flex items-start justify-between gap-3">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${
+                              course.status === 'VALIDEE' ? 'bg-emerald-100 text-emerald-700' :
+                              course.status === 'EN_ATTENTE' ? 'bg-amber-100 text-amber-700' :
+                              'bg-red-100 text-red-700'
                             }`}>
                               {course.status === 'VALIDEE' ? <><CheckCircle className="w-3 h-3" /> Validée</> :
                                course.status === 'EN_ATTENTE' ? <><Clock className="w-3 h-3" /> En attente</> :
                                <><XCircle className="w-3 h-3" /> Rejetée</>}
                             </span>
+
                             <div className="flex gap-2">
-                              <button className="p-1.5 bg-white/20 rounded-lg hover:bg-white/30 transition-colors">
+                              <button
+                                onClick={() => handleEditCourse(course)}
+                                className="rounded-2xl border border-purple-100 bg-purple-50 p-2 text-purple-600 transition-colors cursor-pointer hover:bg-purple-100"
+                              >
                                 <Edit2 className="w-4 h-4" />
                               </button>
-                              <button 
+                              <button
                                 onClick={() => confirmDelete(course.id)}
-                                className="p-1.5 bg-white/20 rounded-lg hover:bg-red-500 transition-colors"
+                                className="rounded-2xl border border-red-100 bg-red-50 p-2 text-red-600 transition-colors cursor-pointer hover:bg-red-100"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
                           </div>
-                          
-                          <h3 className="font-bold text-lg mb-1">{course.titre}</h3>
-                          <p className="text-white/80 text-sm mb-3">{course.description}</p>
-                          <div className="flex items-center gap-3">
-                            <span className="px-2 py-1 bg-white/20 rounded text-xs">{course.students} apprenants</span>
-                            <span className="px-2 py-1 bg-white/20 rounded text-xs">{course.modules} modules</span>
-                            <span className={`px-2 py-1 rounded text-xs ${course.typeCours === 'PAYANT' ? 'bg-yellow-400 text-yellow-900' : 'bg-green-400 text-green-900'}`}>
-                              {course.typeCours === 'PAYANT' ? 'Payant' : 'Gratuit'}
-                            </span>
+
+                          <div className="relative z-10 mt-5 rounded-2xl bg-gradient-to-br from-purple-50 via-white to-purple-50/60 p-4 ring-1 ring-purple-100">
+                            <h3 className="text-lg font-bold tracking-tight text-purple-900">{course.titre}</h3>
+                            <p className="mt-2 line-clamp-2 text-sm leading-6 text-purple-700/80">{course.description}</p>
+
+                            <div className="mt-4 flex flex-wrap items-center gap-3">
+                              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-100">
+                                {course.students} {course.students > 1 ? 'apprenants' : 'apprenant'}
+                              </span>
+                              <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-purple-700 ring-1 ring-purple-100">
+                                {course.sessionsCount} {course.sessionsCount > 1 ? 'sessions' : 'session'}
+                              </span>
+                              <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
+                                course.typeCours === 'PAYANT'
+                                  ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-200'
+                                  : 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200'
+                              }`}>
+                                {course.typeCours === 'PAYANT' ? 'Payant' : 'Gratuit'}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -815,7 +917,7 @@ export default function ProfDashboard() {
               title="Ajouter une formation"
               size="lg"
             >
-              <form onSubmit={(e) => { e.preventDefault(); handleAddCourse(); }} className="space-y-4">
+              <form onSubmit={(e) => { e.preventDefault(); handleSaveCourse(); }} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Titre de la formation *</label>
                   <input
@@ -931,6 +1033,7 @@ export default function ProfDashboard() {
                 </div>
                 
                 {/* Sections Sessions et Chapitres */}
+                {editingCourseId === null && (
                 <div className="border-t pt-4 mt-4">
                   <div className="flex items-center justify-between mb-4">
                     <label className="block text-sm font-medium text-gray-700">Sessions / Modules *</label>
@@ -1182,10 +1285,21 @@ export default function ProfDashboard() {
                     </div>
                   ))}
                 </div>
+                )}
+                {editingCourseId !== null && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm text-blue-800">
+                      Mode modification: vous pouvez mettre à jour les informations principales de la formation.
+                      La structure détaillée des sessions et quiz reste inchangée dans cette édition rapide.
+                    </p>
+                  </div>
+                )}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-sm text-yellow-800 flex items-center gap-2">
                     <Clock className="w-4 h-4" />
-                    Cette formation sera soumise à validation par l'administrateur avant d'être visible publiquement.
+                    {editingCourseId !== null
+                      ? "Les modifications seront enregistrées immédiatement sur cette formation."
+                      : "Cette formation sera soumise à validation par l'administrateur avant d'être visible publiquement."}
                   </p>
                 </div>
                 {submitStatus.message && (
@@ -1198,8 +1312,7 @@ export default function ProfDashboard() {
                     type="button"
                     onClick={() => {
                       setIsModalOpen(false);
-                      setFormErrors({});
-                      setSubmitStatus({ type: null, message: '' });
+                      resetCourseForm();
                     }}
                     className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                   >
@@ -1209,7 +1322,7 @@ export default function ProfDashboard() {
                     type="submit"
                     className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
                   >
-                    Soumettre pour validation
+                    {editingCourseId !== null ? 'Enregistrer les modifications' : 'Soumettre pour validation'}
                   </button>
                 </div>
               </form>
@@ -1218,9 +1331,9 @@ export default function ProfDashboard() {
             {/* Dialog de confirmation de suppression */}
             <ConfirmDialog
               isOpen={isDeleteDialogOpen}
-              title="Supprimer la formation"
-              message="Êtes-vous sûr de vouloir supprimer cette formation ? Cette action est irréversible."
-              confirmText="Supprimer"
+              title="Supprimer définitivement cette formation ?"
+              message="Cette action est irréversible. La formation sélectionnée sera supprimée et ne sera plus disponible dans votre espace."
+              confirmText="Oui, supprimer"
               cancelText="Annuler"
               onConfirm={handleDeleteCourse}
               onCancel={() => setIsDeleteDialogOpen(false)}
@@ -1426,20 +1539,16 @@ export default function ProfDashboard() {
               <span className="w-2 h-8 bg-gray-600 rounded-full"></span>
               Paramètres
             </h2>
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold text-gray-800 mb-2">Profil</h3>
-                <p className="text-sm text-gray-600">Gérez vos informations personnelles</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold text-gray-800 mb-2">Notifications</h3>
-                <p className="text-sm text-gray-600">Configurez vos préférences de notification</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold text-gray-800 mb-2">Sécurité</h3>
-                <p className="text-sm text-gray-600">Modifiez votre mot de passe</p>
-              </div>
-            </div>
+            <DashboardSettingsPanel
+              role="prof"
+              roleLabel="Professeur"
+              stats={[
+                { label: 'Formations actives', value: activeFormationsCount.toString() },
+                { label: 'Apprenants inscrits', value: totalStudentsCount.toString() },
+                { label: 'Revenus générés', value: `${solde.toLocaleString()} XOF` },
+              ]}
+              securityText="Votre espace formateur est actif. Personnalisez votre photo de profil, votre couleur d’accent et vos notifications pour suivre plus facilement vos ventes et l’activité de vos apprenants."
+            />
           </div>
         );
     }

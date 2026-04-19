@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -21,7 +22,7 @@ export default function ConfirmDialog({
   onCancel,
   type = 'danger',
 }: ConfirmDialogProps) {
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const typeConfig = {
     danger: {
@@ -46,8 +47,8 @@ export default function ConfirmDialog({
 
   const config = typeConfig[type];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+  return createPortal(
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -55,7 +56,7 @@ export default function ConfirmDialog({
       />
       
       {/* Dialog */}
-      <div className="relative w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl transform transition-all animate-fadeIn">
+      <div className={`relative w-full max-w-md bg-white rounded-2xl shadow-2xl border ${config.borderColor} transform transition-all animate-fadeIn`}>
         <div className={`p-8 ${config.bgColor} rounded-t-2xl flex flex-col items-center`}>
           <div className="mb-4">
             {config.icon}
@@ -98,6 +99,7 @@ export default function ConfirmDialog({
           animation: fadeIn 0.2s ease-out;
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }

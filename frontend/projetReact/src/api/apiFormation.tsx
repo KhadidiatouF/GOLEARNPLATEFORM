@@ -110,6 +110,9 @@ export const apiFormation = {
         headers: getAuthHeaders()
       });
       if (!response.ok) throw new Error("Erreur lors de la suppression de la formation");
+      if (response.status === 204) {
+        return true;
+      }
       return await response.json();
     } catch (error) {
       console.error('Erreur lors de la suppression de la formation:', error);

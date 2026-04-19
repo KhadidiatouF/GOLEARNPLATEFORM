@@ -5,6 +5,7 @@ import { apiApprenant } from '../api/apiApprenant';
 import DashboardHeader from '../components/DashboardHeader';
 import Certificate from '../components/Certificate';
 import CourseViewer from '../components/Courseviewer';
+import DashboardSettingsPanel from '../components/DashboardSettingsPanel';
 import { BookOpen, Clock, Calendar, PlayCircle, Search, ChevronLeft, ChevronRight, TrendingUp, Award } from 'lucide-react';
 
 type TabType = 'dashboard' | 'formations' | 'progression' | 'certificats' | 'messages';
@@ -71,8 +72,8 @@ const menuItems: MenuItem[] = [
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
   },
   {
-    id: 'messages', label: 'Messages',
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+    id: 'messages', label: 'Paramètre',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
   }
 ];
 
@@ -545,8 +546,17 @@ export default function ApprenantDashboard() {
       case 'messages':
         return (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Messages</h2>
-            <p className="text-gray-500">Aucun message</p>
+            <h2 className="text-xl font-semibold mb-6">Paramètre</h2>
+            <DashboardSettingsPanel
+              role="apprenant"
+              roleLabel="Apprenant"
+              stats={[
+                { label: 'Formations inscrites', value: totalFormations.toString() },
+                { label: 'Progression moyenne', value: `${averageProgress}%` },
+                { label: 'Certificats obtenus', value: totalCertificates.toString() },
+              ]}
+              securityText="Votre compte apprenant est actif. Utilisez une photo de profil, choisissez votre couleur de tableau de bord et gardez vos notifications activées pour suivre votre progression."
+            />
           </div>
         );
     }
