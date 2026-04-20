@@ -40,6 +40,7 @@ interface CertificateData {
 
 // Type pour les formations inscription (utilisé par le dashboard)
 interface EnrolledFormation {
+  apprenantFormationId: number;
   id: number;
   title: string;
   professor: string;
@@ -117,7 +118,7 @@ export default function ApprenantDashboard() {
   const [selectedCertificate, setSelectedCertificate] = useState<CertificateData | null>(null);
 
   // ── ÉTAT pour la formation sélectionnée ──
-  const [selectedFormation, setSelectedFormation] = useState<number | null>(null);
+  const [selectedFormation, setSelectedFormation] = useState<EnrolledFormation | null>(null);
   
   // State pour les formations réelses de l'apprenant
   const [enrolledFormations, setEnrolledFormations] = useState<EnrolledFormation[]>([]);
@@ -234,7 +235,9 @@ export default function ApprenantDashboard() {
 
   // ── Ouvrir une formation : on bascule aussi sur l'onglet formations ──
   const openFormation = (id: number) => {
-    setSelectedFormation(id);
+    const formation = enrolledFormations.find((item) => item.id === id);
+    if (!formation) return;
+    setSelectedFormation(formation);
     setActiveTab('formations');
   };
 
@@ -245,7 +248,8 @@ export default function ApprenantDashboard() {
       return (
         <CourseViewer
           onBack={() => setSelectedFormation(null)}
-          formationId={selectedFormation}
+          formationId={selectedFormation.id}
+          apprenantFormationId={selectedFormation.apprenantFormationId}
         />
       );
     }
@@ -331,9 +335,9 @@ export default function ApprenantDashboard() {
                       </div>
                       <button
                         onClick={() => openFormation(course.id)}
-                        className={`w-full mt-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg font-medium hover:opacity-90 transition`}
+                        className="mt-3 inline-flex min-w-[150px] max-w-full items-center justify-center rounded-lg bg-purple-600 px-5 py-1.5 text-sm font-medium text-white transition hover:opacity-90"
                       >
-                        Continuer
+                        {course.progress > 0 ? 'Continuer' : 'Commencer'}
                       </button>
                     </div>
                   );
@@ -417,9 +421,9 @@ export default function ApprenantDashboard() {
                         {/* ── Bouton : appelle openFormation ── */}
                         <button
                           onClick={() => openFormation(formation.id)}
-                          className="mt-3 w-full py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                          className="mt-3 inline-flex min-w-[190px] max-w-full items-center justify-center rounded-lg bg-blue-600 px-5 py-2 text-sm text-white transition hover:bg-blue-700"
                         >
-                          Continuer la formation
+                          {formation.progress > 0 ? 'Continuer la formation' : 'Commencer la formation'}
                         </button>
                       </div>
                     ))}
@@ -505,9 +509,9 @@ export default function ApprenantDashboard() {
               const paginatedCerts = filteredCerts.slice((certificatPage - 1) * certificatsPerPage, certificatPage * certificatsPerPage);
               return (
                 <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {paginatedCerts.map((cert: CertificateData) => (
-                      <div key={cert.id} className="relative overflow-hidden bg-linear-to-br from-yellow-50 to-amber-100 rounded-xl p-5 border border-yellow-200 hover:shadow-lg transition-shadow">
+                      <div key={cert.id} className="relative mx-auto w-full max-w-[320px] overflow-hidden rounded-xl border border-yellow-200 bg-linear-to-br from-yellow-50 to-amber-100 p-5 transition-shadow hover:shadow-lg">
                         <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-200 rounded-full -mr-8 -mt-8 opacity-50"></div>
                         <div className="flex items-center gap-4">
                           <div className="w-14 h-14 bg-linear-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-md">
@@ -515,14 +519,14 @@ export default function ApprenantDashboard() {
                           </div>
                           <div className="flex-1">
                             <p className="font-bold text-gray-800">{cert.formation?.titre || 'Certification'}</p>
-                            <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <p className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-1 text-sm text-gray-500">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                               {cert.dateObtention ? new Date(cert.dateObtention).toLocaleDateString('fr-FR') : ''}
                             </p>
                           </div>
                         </div>
                         <button onClick={() => handleDownloadCertificate(cert, true)}
-                          className="w-full mt-4 py-2.5 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg font-medium hover:from-yellow-600 hover:to-yellow-700 transition-all shadow-md flex items-center justify-center gap-2">
+                          className="mt-4 inline-flex min-w-[190px] max-w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-yellow-500 to-yellow-600 px-5 py-2.5 text-white font-medium shadow-md transition-all hover:from-yellow-600 hover:to-yellow-700">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                           Telecharger PDF
                         </button>
@@ -646,7 +650,8 @@ export default function ApprenantDashboard() {
           <div className="h-[calc(100vh-64px)] overflow-hidden">
             <CourseViewer
               onBack={() => setSelectedFormation(null)}
-              formationId={selectedFormation}
+              formationId={selectedFormation.id}
+              apprenantFormationId={selectedFormation.apprenantFormationId}
               onCertificationEarned={() => {
                 loadCertifications();
               }}

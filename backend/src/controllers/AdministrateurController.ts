@@ -83,4 +83,13 @@ export class AdministrateurController {
             next(error);
         }
     }
+
+    static async getRevenueHistory(req: Request, res: Response, next: NextFunction) {
+        try {
+            const historique = await administrateurService.getRevenueHistory();
+            FormaterResponse.success(res, historique, "Historique des revenus récupéré avec succès", HttpCode.OK);
+        } catch (error) {
+            next(error);
+        }
+    }
 }

@@ -73,6 +73,51 @@ export class AdministrateurService {
         };
     }
 
+    async getRevenueHistory() {
+        const paiements = await prisma.paiement.findMany({
+            where: {
+                statut: "VALIDE"
+            },
+            include: {
+                apprenantFormation: {
+                    include: {
+                        formation: {
+                            include: {
+                                professeur: {
+                                    include: {
+                                        utilisateur: true
+                                    }
+                                }
+                            }
+                        },
+                        apprenant: {
+                            include: {
+                                utilisateur: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: {
+                datePaiement: "desc"
+            }
+        });
+
+        return paiements.map((paiement) => ({
+            id: paiement.id,
+            date: paiement.datePaiement,
+            formationTitre: paiement.apprenantFormation.formation.titre,
+            formationId: paiement.apprenantFormation.formationId,
+            montantTotal: paiement.montant,
+            partPlateforme: Number((paiement.montant * 0.30).toFixed(2)),
+            partProfesseur: Number((paiement.montant * 0.70).toFixed(2)),
+            apprenantNom: `${paiement.apprenantFormation.apprenant.utilisateur.prenom} ${paiement.apprenantFormation.apprenant.utilisateur.nom}`.trim(),
+            apprenantEmail: paiement.apprenantFormation.apprenant.utilisateur.email,
+            professeurNom: `${paiement.apprenantFormation.formation.professeur.utilisateur.prenom} ${paiement.apprenantFormation.formation.professeur.utilisateur.nom}`.trim(),
+            moyenPaiement: paiement.moyenPaiement
+        }));
+    }
+
     getAllAdministrateurs() {
         return this.administrateurRepo.findAll();
     }

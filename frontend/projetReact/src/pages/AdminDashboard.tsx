@@ -6,7 +6,8 @@ import { apiAdministrateur } from '../api/apiAdministrateur';
 import { apiProfesseur } from '../api/apiProfesseur';
 import { apiCertif } from '../api/apiCertif';
 import DashboardHeader from '../components/DashboardHeader';
-import { Clock, Calendar, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight, Award } from 'lucide-react';
+import LoadingSpinner from '../components/LoadingSpinner';
+import { Clock, Calendar, BarChart3, TrendingDown, PieChart, Activity, Plus, Trash2, Edit2, CheckCircle, XCircle, AlertCircle, Users, BookOpen, GraduationCap, Download, FileSpreadsheet, FileJson, FileText, Search, ChevronLeft, ChevronRight, Award, Loader2, Eye } from 'lucide-react';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import NotificationDialog from '../components/NotificationDialog';
@@ -134,6 +135,42 @@ export default function AdminDashboard() {
     submittedAt?: string;
   }
 
+  interface PreviewChapitre {
+    id: number;
+    titre: string;
+    duree?: string;
+    typeContenu?: string;
+    contenu?: string;
+  }
+
+  interface PreviewQuestion {
+    id: number;
+    contenu?: string;
+  }
+
+  interface PreviewSession {
+    id: number;
+    titre: string;
+    duree?: string;
+    contenu?: string;
+    chapitres?: PreviewChapitre[];
+    quiz?: {
+      id: number;
+      questions?: PreviewQuestion[];
+    };
+  }
+
+  interface PreviewFormationDetail {
+    id: number;
+    titre: string;
+    description: string;
+    categorie?: string;
+    niveau?: string;
+    prix?: number;
+    typeCours?: string;
+    sessions?: PreviewSession[];
+  }
+
   // Type pour les utilisateurs
   interface User {
     id: number;
@@ -186,6 +223,20 @@ export default function AdminDashboard() {
     };
   }
 
+  interface AdminRevenueHistoryItem {
+    id: number;
+    date: string;
+    formationTitre: string;
+    formationId: number;
+    montantTotal: number;
+    partPlateforme: number;
+    partProfesseur: number;
+    apprenantNom: string;
+    apprenantEmail: string;
+    professeurNom: string;
+    moyenPaiement: string;
+  }
+
   // Gestion des utilisateurs
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -196,6 +247,14 @@ export default function AdminDashboard() {
   const [teacherRequestsLoading, setTeacherRequestsLoading] = useState(true);
   const [certifiedLearners, setCertifiedLearners] = useState<CertifiedLearner[]>([]);
   const [certifiedLearnersLoading, setCertifiedLearnersLoading] = useState(true);
+  const [formationsLoading, setFormationsLoading] = useState(true);
+  const [previewFormation, setPreviewFormation] = useState<PreviewFormationDetail | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [processingTeacherRequestId, setProcessingTeacherRequestId] = useState<number | null>(null);
+  const [teacherRequestAction, setTeacherRequestAction] = useState<'approve' | 'reject' | null>(null);
+  const [processingFormationId, setProcessingFormationId] = useState<number | null>(null);
+  const [formationAction, setFormationAction] = useState<'approve' | 'reject' | null>(null);
   const [certifiedSearch, setCertifiedSearch] = useState('');
   const [certifiedFormationFilter, setCertifiedFormationFilter] = useState('');
   const [certifiedPage, setCertifiedPage] = useState(1);
@@ -234,6 +293,20 @@ export default function AdminDashboard() {
       `La demande de retrait des revenus plateforme par ${methodLabel} a bien été prise en compte.`,
       'success'
     );
+  };
+
+  const handlePreviewFormation = async (formationId: number) => {
+    try {
+      setPreviewOpen(true);
+      setPreviewLoading(true);
+      const response = await apiFormation.getOneFormation(formationId);
+      setPreviewFormation((response?.data || response) as PreviewFormationDetail);
+    } catch (error) {
+      console.error('Erreur lors du chargement du contenu de la formation:', error);
+      setPreviewFormation(null);
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   // États pour la pagination et filtration des formations
@@ -288,6 +361,8 @@ export default function AdminDashboard() {
     }
   });
   const [statisticsLoading, setStatisticsLoading] = useState(true);
+  const [revenueHistory, setRevenueHistory] = useState<AdminRevenueHistoryItem[]>([]);
+  const [revenueHistoryLoading, setRevenueHistoryLoading] = useState(true);
   const totalDemandesCount = teacherRequests.length;
 
   // Données complètes à exporter (toutes les statistiques des graphiques)
@@ -629,6 +704,19 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchRevenueHistory = async () => {
+    try {
+      setRevenueHistoryLoading(true);
+      const data = await apiAdministrateur.getRevenueHistory();
+      setRevenueHistory(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'historique des revenus admin:", error);
+      setRevenueHistory([]);
+    } finally {
+      setRevenueHistoryLoading(false);
+    }
+  };
+
   const fetchCertifiedLearners = async () => {
     setCertifiedLearnersLoading(true);
     try {
@@ -645,6 +733,7 @@ export default function AdminDashboard() {
   // Charger les formations depuis l'API
   const fetchFormations = async () => {
     try {
+      setFormationsLoading(true);
       const response = await apiFormation.getFormations();
       // L'API retourne un objet avec la propriété data contenant le tableau
       const data = response.data || response;
@@ -678,28 +767,40 @@ export default function AdminDashboard() {
       console.error(' Erreur lors du chargement des formations:', error);
       setPendingCourses([]);
       setValidatedCourses([]);
+    } finally {
+      setFormationsLoading(false);
     }
   };
 
   // Valider une formation
   const handleValiderFormation = async (formationId: number) => {
     try {
+      setProcessingFormationId(formationId);
+      setFormationAction('approve');
       await apiFormation.validerFormation(formationId);
       // Recharger la liste des formations après validation
       await fetchFormations();
     } catch (error) {
       console.error('Erreur lors de la validation de la formation:', error);
+    } finally {
+      setProcessingFormationId(null);
+      setFormationAction(null);
     }
   };
 
   // Rejeter une formation
   const handleRejeterFormation = async (formationId: number) => {
     try {
+      setProcessingFormationId(formationId);
+      setFormationAction('reject');
       await apiFormation.rejeterFormation(formationId);
       // Recharger la liste des formations après rejet
       await fetchFormations();
     } catch (error) {
       console.error('Erreur lors du rejet de la formation:', error);
+    } finally {
+      setProcessingFormationId(null);
+      setFormationAction(null);
     }
   };
 
@@ -712,6 +813,7 @@ export default function AdminDashboard() {
     fetchFormations();
     fetchTeacherRequests();
     fetchCertifiedLearners();
+    fetchRevenueHistory();
 
     // Rafraichir automatiquement les statistiques toutes les 30 secondes
     const interval = setInterval(() => {
@@ -719,6 +821,7 @@ export default function AdminDashboard() {
       fetchFormations();
       fetchTeacherRequests();
       fetchCertifiedLearners();
+      fetchRevenueHistory();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -741,6 +844,10 @@ export default function AdminDashboard() {
       day: 'numeric'
     });
   };
+
+  const totalRevenuePlatform = revenueHistory.reduce((sum, item) => sum + item.partPlateforme, 0);
+  const totalRevenueProfessors = revenueHistory.reduce((sum, item) => sum + item.partProfesseur, 0);
+  const totalRevenueGross = revenueHistory.reduce((sum, item) => sum + item.montantTotal, 0);
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -1009,7 +1116,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                         {usersLoading ? (
                           <tr>
                             <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                              Chargement des utilisateurs...
+                              <LoadingSpinner label="Chargement des utilisateurs..." size="sm" className="py-2" />
                             </td>
                           </tr>
                         ) : paginatedUsers.length === 0 ? (
@@ -1089,7 +1196,11 @@ const getFirstDayOfMonth = (year: number, month: number) => {
       case 'formations':
         return (
           <div className="space-y-6">
-            {pendingCourses.length > 0 && (
+            {formationsLoading ? (
+              <div className="bg-white rounded-xl shadow-lg p-6">
+                <LoadingSpinner label="Chargement des formations..." />
+              </div>
+            ) : pendingCourses.length > 0 && (
               <div className="bg-white rounded-xl shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <span className="w-2 h-8 bg-yellow-500 rounded-full"></span>
@@ -1118,18 +1229,27 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                       </div>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleValidateCourse(course.id)}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                          onClick={() => handlePreviewFormation(course.id)}
+                          className="flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
                         >
-                          <CheckCircle className="w-4 h-4" />
-                          Valider
+                          <Eye className="w-4 h-4" />
+                          Voir contenu
+                        </button>
+                        <button
+                          onClick={() => handleValidateCourse(course.id)}
+                          disabled={processingFormationId === course.id}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {processingFormationId === course.id && formationAction === 'approve' ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                          {processingFormationId === course.id && formationAction === 'approve' ? 'Validation...' : 'Valider'}
                         </button>
                         <button
                           onClick={() => handleRejectCourse(course.id)}
-                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                          disabled={processingFormationId === course.id}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                          <XCircle className="w-4 h-4" />
-                          Rejeter
+                          {processingFormationId === course.id && formationAction === 'reject' ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                          {processingFormationId === course.id && formationAction === 'reject' ? 'Rejet...' : 'Rejeter'}
                         </button>
                       </div>
                     </div>
@@ -1363,7 +1483,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
             </div>
 
             {certifiedLearnersLoading ? (
-              <p className="text-center text-gray-500 py-8">Chargement des apprenants certifiés...</p>
+              <LoadingSpinner label="Chargement des apprenants certifiés..." />
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -1762,7 +1882,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                   <div>
                     <p className="text-gray-500 text-sm font-medium">Total Revenu Plateforme</p>
                     <h3 className="text-3xl font-bold text-gray-800 mt-1">
-                      { (user?.solde || 0).toFixed(2) } FCFA
+                      { totalRevenuePlatform.toFixed(2) } FCFA
                     </h3>
                     <p className="text-purple-600 text-sm mt-1">30% sur toutes les ventes</p>
                   </div>
@@ -1777,7 +1897,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                   <div>
                     <p className="text-gray-500 text-sm font-medium">Total Réversé Professeurs</p>
                     <h3 className="text-3xl font-bold text-gray-800 mt-1">
-                      { ((user?.solde || 0) * 70 / 30).toFixed(2) } FCFA
+                      { totalRevenueProfessors.toFixed(2) } FCFA
                     </h3>
                     <p className="text-blue-600 text-sm mt-1">70% part des créateurs</p>
                   </div>
@@ -1792,7 +1912,7 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                   <div>
                     <p className="text-gray-500 text-sm font-medium">Chiffre d'affaire Total Brut</p>
                     <h3 className="text-3xl font-bold text-gray-800 mt-1">
-                      { ((user?.solde || 0) * 100 / 30).toFixed(2) } FCFA
+                      { totalRevenueGross.toFixed(2) } FCFA
                     </h3>
                     <p className="text-purple-600 text-sm mt-1">Somme de toutes les transactions</p>
                   </div>
@@ -1801,6 +1921,50 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold">Historique des revenus</h2>
+                <p className="text-sm text-gray-500">{revenueHistory.length} transaction(s)</p>
+              </div>
+              {revenueHistoryLoading ? (
+                <LoadingSpinner label="Chargement de l'historique des revenus..." />
+              ) : revenueHistory.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">Aucun achat validé pour le moment.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Date</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Apprenant</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Formation</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Professeur</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Paiement</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Montant brut</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Gain plateforme</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {revenueHistory.map((item) => (
+                        <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-600">{new Date(item.date).toLocaleDateString('fr-FR')}</td>
+                          <td className="px-4 py-3">
+                            <p className="text-sm font-medium text-gray-800">{item.apprenantNom}</p>
+                            <p className="text-xs text-gray-500">{item.apprenantEmail}</p>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{item.formationTitre}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{item.professeurNom}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{item.moyenPaiement}</td>
+                          <td className="px-4 py-3 text-sm text-right font-medium text-gray-800">{item.montantTotal.toFixed(2)} FCFA</td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{item.partPlateforme.toFixed(2)} FCFA</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -1897,6 +2061,8 @@ const getFirstDayOfMonth = (year: number, month: number) => {
 
               const handleValide = async (id: number) => {
                 try {
+                  setProcessingTeacherRequestId(id);
+                  setTeacherRequestAction('approve');
                   await apiProfesseur.validerDemande(id);
                   await fetchTeacherRequests();
                   showNotification('Demande approuvée', 'Le compte professeur a été créé et les identifiants ont été envoyés par email.', 'success');
@@ -1906,11 +2072,16 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                     error instanceof Error ? error.message : 'Erreur lors de la validation de la demande',
                     'error'
                   );
+                } finally {
+                  setProcessingTeacherRequestId(null);
+                  setTeacherRequestAction(null);
                 }
               };
 
               const handleReject = async (id: number) => {
                 try {
+                  setProcessingTeacherRequestId(id);
+                  setTeacherRequestAction('reject');
                   await apiProfesseur.rejeterDemande(id);
                   await fetchTeacherRequests();
                   showNotification('Demande rejetée', 'La demande de formateur a été rejetée.', 'info');
@@ -1920,11 +2091,14 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                     error instanceof Error ? error.message : 'Erreur lors du rejet de la demande',
                     'error'
                   );
+                } finally {
+                  setProcessingTeacherRequestId(null);
+                  setTeacherRequestAction(null);
                 }
               };
 
               if (teacherRequestsLoading) {
-                return <p className="text-sm text-gray-500">Chargement des demandes...</p>;
+                return <LoadingSpinner label="Chargement des demandes..." />;
               }
 
               return (
@@ -1970,17 +2144,33 @@ const getFirstDayOfMonth = (year: number, month: number) => {
                               <p className="text-xs text-gray-400">{new Date(demande.dateCreation).toLocaleDateString('fr-FR')}</p>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => void handleValide(demande.id)} className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Valider
+                              <button
+                                onClick={() => void handleValide(demande.id)}
+                                disabled={processingTeacherRequestId === demande.id}
+                                className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center justify-center gap-1 disabled:cursor-not-allowed disabled:opacity-70"
+                              >
+                                {processingTeacherRequestId === demande.id && teacherRequestAction === 'approve' ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                                {processingTeacherRequestId === demande.id && teacherRequestAction === 'approve' ? 'Validation...' : 'Valider'}
                               </button>
-                              <button onClick={() => void handleReject(demande.id)} className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium flex items-center justify-center gap-1">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                                Rejeter
+                              <button
+                                onClick={() => void handleReject(demande.id)}
+                                disabled={processingTeacherRequestId === demande.id}
+                                className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium flex items-center justify-center gap-1 disabled:cursor-not-allowed disabled:opacity-70"
+                              >
+                                {processingTeacherRequestId === demande.id && teacherRequestAction === 'reject' ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                )}
+                                {processingTeacherRequestId === demande.id && teacherRequestAction === 'reject' ? 'Rejet...' : 'Rejeter'}
                               </button>
                             </div>
                           </div>
@@ -2185,6 +2375,85 @@ const getFirstDayOfMonth = (year: number, month: number) => {
             <button type="submit" className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700">{editingUser?.id ? 'Modifier' : 'Ajouter'}</button>
           </div>
         </form>
+      </Modal>
+      <Modal
+        isOpen={previewOpen}
+        onClose={() => {
+          setPreviewOpen(false);
+          setPreviewFormation(null);
+        }}
+        title={previewFormation?.titre || 'Aperçu de la formation'}
+        size="xl"
+      >
+        {previewLoading ? (
+          <LoadingSpinner label="Chargement du contenu de la formation..." />
+        ) : !previewFormation ? (
+          <p className="py-8 text-center text-gray-500">Impossible de charger le contenu de cette formation.</p>
+        ) : (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm text-gray-700">{previewFormation.description}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                {previewFormation.categorie && <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-gray-600">{previewFormation.categorie}</span>}
+                {previewFormation.niveau && <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-gray-600">{previewFormation.niveau}</span>}
+                {previewFormation.typeCours && <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-gray-600">{previewFormation.typeCours}</span>}
+                {typeof previewFormation.prix === 'number' && (
+                  <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-gray-600">
+                    {previewFormation.prix === 0 ? 'Gratuit' : `${previewFormation.prix} FCFA`}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Programme de la formation</h3>
+              {previewFormation.sessions && previewFormation.sessions.length > 0 ? (
+                previewFormation.sessions.map((session, index) => (
+                  <div key={session.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-purple-600">Session {index + 1}</p>
+                        <h4 className="text-base font-semibold text-gray-900">{session.titre}</h4>
+                      </div>
+                      {session.duree && (
+                        <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700">
+                          {session.duree}
+                        </span>
+                      )}
+                    </div>
+                    {session.contenu && <p className="mt-3 text-sm text-gray-600">{session.contenu}</p>}
+                    {session.chapitres && session.chapitres.length > 0 && (
+                      <div className="mt-4">
+                        <p className="mb-2 text-sm font-semibold text-gray-800">Chapitres</p>
+                        <div className="space-y-2">
+                          {session.chapitres.map((chapitre) => (
+                            <div key={chapitre.id} className="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-medium text-gray-800">{chapitre.titre}</span>
+                                {chapitre.typeContenu && <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-500">{chapitre.typeContenu}</span>}
+                                {chapitre.duree && <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-500">{chapitre.duree}</span>}
+                              </div>
+                              {chapitre.contenu && <p className="mt-2 line-clamp-3 text-sm text-gray-600">{chapitre.contenu}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {session.quiz?.questions && session.quiz.questions.length > 0 && (
+                      <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50 p-3">
+                        <p className="text-sm font-semibold text-amber-800">
+                          Quiz inclus: {session.quiz.questions.length} question(s)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">Aucune session disponible pour cette formation.</p>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
       {/* Dialog de confirmation de suppression */}
       <ConfirmDialog

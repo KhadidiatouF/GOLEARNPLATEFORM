@@ -94,5 +94,20 @@ export const apiAdministrateur = {
       console.error('Erreur lors du fetch des statistiques:', error);
       throw error;
     }
+  },
+
+  getRevenueHistory: async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/admin/revenus/historique`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) throw new Error("Erreur lors du fetch de l'historique des revenus admin");
+      const result = await response.json();
+      return result.data || result;
+    } catch (error) {
+      console.error("Erreur lors du fetch de l'historique des revenus admin:", error);
+      throw error;
+    }
   }
 };

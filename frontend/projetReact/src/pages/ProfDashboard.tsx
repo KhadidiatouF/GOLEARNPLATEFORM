@@ -4,12 +4,13 @@ import DashboardHeader from '../components/DashboardHeader';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DashboardSettingsPanel from '../components/DashboardSettingsPanel';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { apiFormation } from '../api/apiFormation';
 import { apiProgression } from '../api/apiProgression';
 import { apiUsers } from '../api/apiUsers';
 import { apiProfesseur } from '../api/apiProfesseur';
 import { apiCertif } from '../api/apiCertif';
-import { BookOpen, Users, Calendar, Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight, Award } from 'lucide-react';
+import { BookOpen, Users, Calendar, Plus, Trash2, Edit2, Clock, CheckCircle, XCircle, Search, ChevronLeft, ChevronRight, Award, Loader2 } from 'lucide-react';
 
 // Types pour la création complète de formation
 
@@ -42,6 +43,15 @@ interface Session {
   chapitres: Chapitre[];
   quiz?: Quiz;
 }
+
+const createEmptyQuestion = (): Question => ({
+  contenu: '',
+  reponses: [{ contenu: '', estCorrecte: false }]
+});
+
+const createEmptyQuiz = (): Quiz => ({
+  questions: [createEmptyQuestion()]
+});
 
 interface ApprenantData {
   apprenant?: {
@@ -199,6 +209,9 @@ export default function ProfDashboard() {
   const [solde, setSolde] = useState<number>(0);
   const [revenueHistory, setRevenueHistory] = useState<RevenueHistoryItem[]>([]);
   const [revenueHistoryLoading, setRevenueHistoryLoading] = useState(true);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [isSavingCourse, setIsSavingCourse] = useState(false);
+  const [isDeletingCourse, setIsDeletingCourse] = useState(false);
   const [newCourse, setNewCourse] = useState({
     titre: '',
     description: '',
@@ -207,7 +220,8 @@ export default function ProfDashboard() {
     niveau: '',
     typeCours: 'GRATUIT' as 'PAYANT' | 'GRATUIT',
     image: '',
-    sessions: [{ titre: '', chapitres: [], quiz: undefined } as Session]
+    sessions: [{ titre: '', chapitres: [], quiz: undefined } as Session],
+    quizFinal: undefined as Quiz | undefined
   });
   
   // Gestion des erreurs du formulaire
@@ -302,10 +316,121 @@ export default function ProfDashboard() {
       niveau: '',
       typeCours: 'GRATUIT',
       image: '',
-      sessions: [{ titre: '', chapitres: [], quiz: undefined }]
+      sessions: [{ titre: '', chapitres: [], quiz: undefined }],
+      quizFinal: undefined
     });
     setFormErrors({});
     setSubmitStatus({ type: null, message: '' });
+  };
+
+  const formationsExemples = [
+    {
+      titre: 'Développement Web Full Stack avec React & Node.js',
+      description: 'Formation complète pour maîtriser le développement web moderne : frontend avec React, backend avec Node.js, base de données PostgreSQL, authentification JWT, déploiement.',
+      prix: 15000,
+      categorie: 'Développement Web',
+      niveau: 'Intermédiaire',
+      typeCours: 'PAYANT' as 'PAYANT' | 'GRATUIT',
+      image: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      titre: 'Design UI/UX avec Figma pour débutants',
+      description: 'Apprends le design d\'interfaces modernes, les principes UX, la création de wireframes, prototypes interactifs et systèmes de design complets avec Figma.',
+      prix: 12000,
+      categorie: 'Design',
+      niveau: 'Débutant',
+      typeCours: 'PAYANT' as 'PAYANT' | 'GRATUIT',
+      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      titre: 'Intelligence Artificielle pour Développeurs',
+      description: 'Découvre les APIs OpenAI, intégrer ChatGPT dans tes applications, créer des agents IA, fine tuning et bonnes pratiques pour le développement AI.',
+      prix: 25000,
+      categorie: 'Intelligence Artificielle',
+      niveau: 'Avancé',
+      typeCours: 'PAYANT' as 'PAYANT' | 'GRATUIT',
+      image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      titre: 'Base de données PostgreSQL avancé',
+      description: 'Maîtrise PostgreSQL : indexes, transactions, procédures stockées, optimisation de requêtes, réplication et sécurité des bases de données.',
+      prix: 10000,
+      categorie: 'Base de données',
+      niveau: 'Intermédiaire',
+      typeCours: 'GRATUIT' as 'PAYANT' | 'GRATUIT',
+      image: 'https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&w=800&q=80'
+    },
+    {
+      titre: 'Développement Mobile avec React Native',
+      description: 'Crée des applications mobiles natives iOS et Android avec une seule base de code React Native, navigation, state management et publication sur les stores.',
+      prix: 18000,
+      categorie: 'Développement Mobile',
+      niveau: 'Intermédiaire',
+      typeCours: 'PAYANT' as 'PAYANT' | 'GRATUIT',
+      image: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=800&q=80'
+    }
+  ];
+
+  const autoFillForm = () => {
+    // Choisir une formation aléatoire différente à chaque clique
+    const randomIndex = Math.floor(Math.random() * formationsExemples.length);
+    const formation = formationsExemples[randomIndex];
+    
+    setNewCourse({
+      titre: formation.titre,
+      description: formation.description,
+      prix: formation.prix,
+      categorie: formation.categorie,
+      niveau: formation.niveau,
+      typeCours: formation.typeCours,
+      image: formation.image,
+      sessions: [
+        {
+          titre: 'Introduction et Fondements',
+          contenu: 'Présentation du parcours, outils nécessaires, configuration environnement',
+          duree: '2h',
+          chapitres: [
+            { titre: 'Présentation de la formation', contenu: 'Objectifs, programme, prérequis', duree: '20min', typeContenu: 'VIDEO' },
+            { titre: 'Installation des outils', contenu: 'Configuration de l\'environnement de développement', duree: '45min', typeContenu: 'VIDEO' },
+            { titre: 'Premier exercice pratique', contenu: 'Mise en application des concepts vus', duree: '35min', typeContenu: 'VIDEO' }
+          ],
+          quiz: {
+            questions: [
+              {
+                contenu: 'Quel est le principal objectif de cette formation ?',
+                reponses: [
+                  { contenu: 'Maîtriser les concepts enseignés', estCorrecte: true },
+                  { contenu: 'Passer le quiz le plus vite', estCorrecte: false },
+                  { contenu: 'Juste obtenir un certificat', estCorrecte: false }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          titre: 'Concepts avancés',
+          contenu: 'Approfondissement des notions, bonnes pratiques et astuces professionnelles',
+          duree: '4h',
+          chapitres: [
+            { titre: 'Bonnes pratiques professionnelles', contenu: 'Standards de code, architecture', duree: '1h15', typeContenu: 'VIDEO' },
+            { titre: 'Cas d\'usage réel', contenu: 'Exemple concret utilisé en entreprise', duree: '1h45', typeContenu: 'VIDEO' }
+          ]
+        }
+      ],
+      quizFinal: {
+        questions: [
+          {
+            contenu: 'Quelle affirmation est correcte ?',
+            reponses: [
+              { contenu: 'La pratique régulière est la clé', estCorrecte: true },
+              { contenu: 'Il faut apprendre par coeur', estCorrecte: false },
+              { contenu: 'La théorie suffit', estCorrecte: false }
+            ]
+          }
+        ]
+      }
+    });
+    setFormErrors({});
   };
 
   const handleSaveCourse = async () => {
@@ -319,6 +444,7 @@ export default function ProfDashboard() {
     }
     
     try {
+      setIsSavingCourse(true);
       // Récupérer le professeurId depuis le contexte d'authentification
       const professeurId = user?.professeurId || user?.id;
       
@@ -375,7 +501,15 @@ export default function ProfDashboard() {
                 reponses: q.reponses.filter(r => r.contenu.trim())
               }))
             } : undefined
-          }))
+          })),
+          quizFinal: newCourse.quizFinal && newCourse.quizFinal.questions.length > 0 ? {
+            questions: newCourse.quizFinal.questions
+              .filter(q => q.contenu.trim())
+              .map(q => ({
+                contenu: q.contenu,
+                reponses: q.reponses.filter(r => r.contenu.trim())
+              }))
+          } : undefined
         };
 
         const response = await apiFormation.createCompleteFormation(formationData);
@@ -405,19 +539,26 @@ export default function ProfDashboard() {
     } catch (error) {
       console.error('Erreur lors de la sauvegarde de la formation:', error);
       setSubmitStatus({ type: 'error', message: editingCourseId !== null ? 'Erreur lors de la modification de la formation. Veuillez réessayer.' : 'Erreur lors de la création de la formation. Veuillez réessayer.' });
+    } finally {
+      setIsSavingCourse(false);
     }
   };
 
   const handleDeleteCourse = async () => {
     if (courseToDelete) {
       try {
+        setIsDeletingCourse(true);
         await apiFormation.deleteFormation(courseToDelete);
-        setCourses(courses.filter(c => c.id !== courseToDelete));
+        setCourses((prevCourses) => prevCourses.filter((c) => c.id !== courseToDelete));
         setCourseToDelete(null);
         setIsDeleteDialogOpen(false);
+        setSubmitStatus({ type: 'success', message: 'Formation supprimée avec succès.' });
       } catch (error) {
         console.error('Erreur lors de la suppression de la formation:', error);
-        setSubmitStatus({ type: 'error', message: 'Erreur lors de la suppression de la formation. Veuillez réessayer.' });
+        const message = error instanceof Error ? error.message : 'Erreur lors de la suppression de la formation. Veuillez réessayer.';
+        setSubmitStatus({ type: 'error', message });
+      } finally {
+        setIsDeletingCourse(false);
       }
     }
   };
@@ -439,7 +580,8 @@ export default function ProfDashboard() {
       niveau: course.niveau,
       typeCours: course.typeCours,
       image: course.image || '',
-      sessions: [{ titre: '', chapitres: [], quiz: undefined }]
+      sessions: [{ titre: '', chapitres: [], quiz: undefined }],
+      quizFinal: undefined
     });
     setIsModalOpen(true);
   };
@@ -478,6 +620,7 @@ export default function ProfDashboard() {
   useEffect(() => {
     const fetchProfessorFormations = async () => {
       try {
+        setCoursesLoading(true);
         console.log('Chargement des formations pour le professeur...');
         const response = await apiFormation.getFormations();
         
@@ -509,6 +652,8 @@ export default function ProfDashboard() {
         }
       } catch (error) {
         console.error('Erreur lors du chargement des formations:', error);
+      } finally {
+        setCoursesLoading(false);
       }
     };
 
@@ -716,7 +861,7 @@ export default function ProfDashboard() {
                   </div>
                   <div className="space-y-3">
                     {apprenantsLoading ? (
-                      <p className="py-6 text-center text-sm text-gray-500">Chargement des progressions...</p>
+                      <LoadingSpinner label="Chargement des progressions..." size="sm" className="py-6" />
                     ) : learnerProgressItems.length === 0 ? (
                       <p className="py-6 text-center text-sm text-gray-500">Aucune progression apprenant disponible pour le moment.</p>
                     ) : learnerProgressItems.map((student) => (
@@ -745,7 +890,9 @@ export default function ProfDashboard() {
                     <h3 className="text-base font-semibold text-gray-800">Cours ajoutés récemment</h3>
                   </div>
                   <div className="space-y-3">
-                    {recentCourses.length === 0 ? (
+                    {coursesLoading ? (
+                      <LoadingSpinner label="Chargement des formations..." size="sm" className="py-6" />
+                    ) : recentCourses.length === 0 ? (
                       <p className="py-6 text-center text-sm text-gray-500">Aucune formation ajoutée pour le moment.</p>
                     ) : recentCourses.map((course) => (
                       <div key={course.id} className="p-3 bg-gray-50 rounded-lg">
@@ -897,15 +1044,17 @@ export default function ProfDashboard() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleEditCourse(course)}
-                                className="rounded-2xl border border-purple-100 bg-purple-50 p-2 text-purple-600 transition-colors cursor-pointer hover:bg-purple-100"
+                                disabled={isDeletingCourse}
+                                className="rounded-2xl border border-purple-100 bg-purple-50 p-2 text-purple-600 transition-colors cursor-pointer hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => confirmDelete(course.id)}
-                                className="rounded-2xl border border-red-100 bg-red-50 p-2 text-red-600 transition-colors cursor-pointer hover:bg-red-100"
+                                disabled={isDeletingCourse}
+                                className="rounded-2xl border border-red-100 bg-red-50 p-2 text-red-600 transition-colors cursor-pointer hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                {isDeletingCourse && courseToDelete === course.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                               </button>
                             </div>
                           </div>
@@ -973,6 +1122,17 @@ export default function ProfDashboard() {
               size="lg"
             >
               <form onSubmit={(e) => { e.preventDefault(); handleSaveCourse(); }} className="space-y-4">
+                
+                <div className="flex justify-end mb-4">
+                  <button
+                    type="button"
+                    onClick={autoFillForm}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                  >
+                    ⚡ Préremplir avec exemple
+                  </button>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Titre de la formation *</label>
                   <input
@@ -1226,7 +1386,7 @@ export default function ProfDashboard() {
                                 type="button"
                                 onClick={() => {
                                   const updatedSessions = [...newCourse.sessions];
-                                  updatedSessions[sessionIndex].quiz = { questions: [{ contenu: '', reponses: [{ contenu: '', estCorrecte: false }] }] };
+                                  updatedSessions[sessionIndex].quiz = createEmptyQuiz();
                                   setNewCourse({ ...newCourse, sessions: updatedSessions });
                                 }}
                                 className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1"
@@ -1326,7 +1486,7 @@ export default function ProfDashboard() {
                                 type="button"
                                 onClick={() => {
                                   const updatedSessions = [...newCourse.sessions];
-                                  updatedSessions[sessionIndex].quiz!.questions.push({ contenu: '', reponses: [{ contenu: '', estCorrecte: false }] });
+                                  updatedSessions[sessionIndex].quiz!.questions.push(createEmptyQuestion());
                                   setNewCourse({ ...newCourse, sessions: updatedSessions });
                                 }}
                                 className="text-xs text-green-600 hover:text-green-700 flex items-center gap-1"
@@ -1339,6 +1499,142 @@ export default function ProfDashboard() {
                       </div>
                     </div>
                   ))}
+
+                  <div className="bg-amber-50 rounded-lg border border-amber-200 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="text-sm font-semibold text-amber-900">Quiz final de la formation</h4>
+                        <p className="text-xs text-amber-700">Ajoutez l’examen final affiché à la fin du parcours.</p>
+                      </div>
+                      {!newCourse.quizFinal || newCourse.quizFinal.questions.length === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setNewCourse({ ...newCourse, quizFinal: createEmptyQuiz() })}
+                          className="text-xs text-amber-700 hover:text-amber-800 flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Ajouter le quiz final
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setNewCourse({ ...newCourse, quizFinal: undefined })}
+                          className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3 h-3" /> Supprimer le quiz final
+                        </button>
+                      )}
+                    </div>
+
+                    {newCourse.quizFinal && newCourse.quizFinal.questions.length > 0 && (
+                      <div className="bg-white rounded border border-amber-200 p-3">
+                        {newCourse.quizFinal.questions.map((question, questionIndex) => (
+                          <div key={questionIndex} className="bg-amber-50 rounded border border-amber-100 p-3 mb-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-amber-900">Question finale {questionIndex + 1}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedFinalQuiz = newCourse.quizFinal ? { ...newCourse.quizFinal, questions: [...newCourse.quizFinal.questions] } : undefined;
+                                  updatedFinalQuiz?.questions.splice(questionIndex, 1);
+                                  setNewCourse({
+                                    ...newCourse,
+                                    quizFinal: updatedFinalQuiz && updatedFinalQuiz.questions.length > 0 ? updatedFinalQuiz : undefined
+                                  });
+                                }}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={question.contenu}
+                              onChange={(e) => {
+                                if (!newCourse.quizFinal) return;
+                                const updatedFinalQuiz = { ...newCourse.quizFinal, questions: [...newCourse.quizFinal.questions] };
+                                updatedFinalQuiz.questions[questionIndex].contenu = e.target.value;
+                                setNewCourse({ ...newCourse, quizFinal: updatedFinalQuiz });
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2"
+                              placeholder="Contenu de la question finale"
+                            />
+
+                            <div className="ml-2">
+                              <span className="text-xs text-gray-500">Réponses (cochez la bonne réponse):</span>
+                              {question.reponses.map((reponse, reponseIndex) => (
+                                <div key={reponseIndex} className="flex items-center gap-2 mt-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={reponse.estCorrecte}
+                                    onChange={(e) => {
+                                      if (!newCourse.quizFinal) return;
+                                      const updatedFinalQuiz = { ...newCourse.quizFinal, questions: [...newCourse.quizFinal.questions] };
+                                      updatedFinalQuiz.questions[questionIndex].reponses[reponseIndex].estCorrecte = e.target.checked;
+                                      setNewCourse({ ...newCourse, quizFinal: updatedFinalQuiz });
+                                    }}
+                                    className="w-4 h-4"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={reponse.contenu}
+                                    onChange={(e) => {
+                                      if (!newCourse.quizFinal) return;
+                                      const updatedFinalQuiz = { ...newCourse.quizFinal, questions: [...newCourse.quizFinal.questions] };
+                                      updatedFinalQuiz.questions[questionIndex].reponses[reponseIndex].contenu = e.target.value;
+                                      setNewCourse({ ...newCourse, quizFinal: updatedFinalQuiz });
+                                    }}
+                                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs"
+                                    placeholder="Réponse"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!newCourse.quizFinal) return;
+                                      const updatedFinalQuiz = { ...newCourse.quizFinal, questions: [...newCourse.quizFinal.questions] };
+                                      updatedFinalQuiz.questions[questionIndex].reponses.splice(reponseIndex, 1);
+                                      setNewCourse({ ...newCourse, quizFinal: updatedFinalQuiz });
+                                    }}
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!newCourse.quizFinal) return;
+                                  const updatedFinalQuiz = { ...newCourse.quizFinal, questions: [...newCourse.quizFinal.questions] };
+                                  updatedFinalQuiz.questions[questionIndex].reponses.push({ contenu: '', estCorrecte: false });
+                                  setNewCourse({ ...newCourse, quizFinal: updatedFinalQuiz });
+                                }}
+                                className="text-xs text-blue-600 hover:text-blue-700 mt-1 flex items-center gap-1"
+                              >
+                                <Plus className="w-3 h-3" /> Ajouter une réponse
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!newCourse.quizFinal) return;
+                            setNewCourse({
+                              ...newCourse,
+                              quizFinal: {
+                                ...newCourse.quizFinal,
+                                questions: [...newCourse.quizFinal.questions, createEmptyQuestion()]
+                              }
+                            });
+                          }}
+                          className="text-xs text-amber-700 hover:text-amber-800 flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" /> Ajouter une question finale
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 )}
                 {editingCourseId !== null && (
@@ -1369,15 +1665,22 @@ export default function ProfDashboard() {
                       setIsModalOpen(false);
                       resetCourseForm();
                     }}
-                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                    disabled={isSavingCourse}
+                    className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+                    disabled={isSavingCourse}
+                    className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:cursor-not-allowed disabled:opacity-80"
                   >
-                    {editingCourseId !== null ? 'Enregistrer les modifications' : 'Soumettre pour validation'}
+                    <span className="flex items-center justify-center gap-2">
+                      {isSavingCourse ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      {isSavingCourse
+                        ? (editingCourseId !== null ? 'Enregistrement...' : 'Soumission...')
+                        : (editingCourseId !== null ? 'Enregistrer les modifications' : 'Soumettre pour validation')}
+                    </span>
                   </button>
                 </div>
               </form>
@@ -1388,10 +1691,14 @@ export default function ProfDashboard() {
               isOpen={isDeleteDialogOpen}
               title="Supprimer définitivement cette formation ?"
               message="Cette action est irréversible. La formation sélectionnée sera supprimée et ne sera plus disponible dans votre espace."
-              confirmText="Oui, supprimer"
+              confirmText={isDeletingCourse ? "Suppression..." : "Oui, supprimer"}
               cancelText="Annuler"
               onConfirm={handleDeleteCourse}
-              onCancel={() => setIsDeleteDialogOpen(false)}
+              onCancel={() => {
+                if (!isDeletingCourse) {
+                  setIsDeleteDialogOpen(false);
+                }
+              }}
               type="danger"
             />
           </div>
@@ -1449,10 +1756,7 @@ export default function ProfDashboard() {
 
             {/* Apprenants filtrés */}
             {apprenantsLoading ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-                <span className="ml-3 text-gray-600">Chargement des apprenants...</span>
-              </div>
+              <LoadingSpinner label="Chargement des apprenants..." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -1585,7 +1889,7 @@ export default function ProfDashboard() {
             </div>
 
             {certifiedLearnersLoading ? (
-              <p className="text-center text-gray-500 py-8">Chargement des apprenants certifiés...</p>
+              <LoadingSpinner label="Chargement des apprenants certifiés..." />
             ) : (
               <>
                 <div className="overflow-x-auto">
@@ -1692,7 +1996,7 @@ export default function ProfDashboard() {
                 <h3 className="font-semibold text-gray-800 mb-4">Historique des revenus</h3>
                 <div className="space-y-3">
                   {revenueHistoryLoading ? (
-                    <p className="text-center text-gray-500 py-6">Chargement de l'historique des revenus...</p>
+                    <LoadingSpinner label="Chargement de l'historique des revenus..." />
                   ) : revenueHistory.length === 0 ? (
                     <p className="text-center text-gray-500 py-6">Aucun achat validé pour vos formations pour le moment.</p>
                   ) : (

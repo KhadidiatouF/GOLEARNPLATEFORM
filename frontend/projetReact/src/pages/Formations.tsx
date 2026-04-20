@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from '../components/Header';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,6 +38,7 @@ const Formations: React.FC = () => {
   const { user, isAuthenticated } = useAuth();
   const [formations, setFormations] = useState<Formation[]>(defaultFormations);
   const [loading, setLoading] = useState(false);
+  const [enrollingFormationId, setEnrollingFormationId] = useState<number | null>(null);
 
   // Charger les formations depuis l'API (endpoint public)
   useEffect(() => {
@@ -72,7 +74,7 @@ const Formations: React.FC = () => {
   if (loading) {
     return (
       <div className="w-screen h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-purple-600 text-xl">Chargement des formations...</div>
+        <LoadingSpinner label="Chargement des formations..." size="lg" />
       </div>
     );
   }
@@ -94,37 +96,27 @@ const Formations: React.FC = () => {
   };
 
   // Gérer l'inscription à une formation gratuite
-  const handleFreeEnrollment = (formation: Formation): void => {
+  const handleFreeEnrollment = async (formation: Formation): Promise<void> => {
     if (!isAuthenticated || !user) {
       navigate('/login', { state: { from: { pathname: '/formations' }, formationId: formation.id } });
       return;
     }
 
-    // Vérifier si déjà inscrit
-    const inscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
-    const dejaInscrit = inscriptions.some(
-      (inscription: { coursId: number; utilisateurId: number }) => 
-        inscription.coursId === formation.id && inscription.utilisateurId === user.id
-    );
-
-    if (dejaInscrit) {
+    try {
+      setEnrollingFormationId(formation.id);
+      await apiFormation.inscriptionFormation(formation.id);
       navigate('/apprenant');
-      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur lors de l'inscription";
+      if (message.toLowerCase().includes('déjà inscrit')) {
+        navigate('/apprenant');
+        return;
+      }
+      console.error('Erreur inscription formation gratuite:', error);
+      window.alert(message);
+    } finally {
+      setEnrollingFormationId(null);
     }
-
-    // Sauvegarder l'inscription
-    const inscription = {
-      id: `${formation.id}-${user.id}`,
-      coursId: formation.id,
-      utilisateurId: user.id,
-      dateInscription: new Date().toISOString(),
-      coursTitre: formation.titre
-    };
-    inscriptions.push(inscription);
-    localStorage.setItem('inscriptions', JSON.stringify(inscriptions));
-
-    console.log('Inscription créée (gratuit):', inscription);
-    navigate('/apprenant');
   };
 
   const freeFormations = formations.filter(f => isFormationFree(f));
@@ -204,9 +196,10 @@ const Formations: React.FC = () => {
                   </ul>
                   <button 
                     onClick={() => handleFreeEnrollment(formation)}
-                    className="w-full bg-purple-500 text-white py-4 rounded-xl font-semibold hover:bg-purple-600 transition cursor-pointer shadow-lg hover:shadow-xl"
+                    disabled={enrollingFormationId === formation.id}
+                    className="w-full bg-purple-500 text-white py-4 rounded-xl font-semibold hover:bg-purple-600 transition cursor-pointer shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    Commencer la formation
+                    {enrollingFormationId === formation.id ? 'Inscription...' : 'Commencer la formation'}
                   </button>
                 </div>
               </div>

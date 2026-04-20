@@ -102,7 +102,9 @@ export class FormationController {
             await formationService.deleteFormation(id);
             res.status(HttpCode.NO_CONTENT).send();
         } catch (error: any) {
-            return FormaterResponse.failed(res, "Formation non trouvée", 404);
+            const message = error?.message || "Erreur lors de la suppression de la formation";
+            const statusCode = message === "Formation non trouvée" ? 404 : HttpCode.INTERNAL_SERVER_ERROR;
+            return FormaterResponse.failed(res, message, statusCode);
         }
     }
 
@@ -171,4 +173,3 @@ export class FormationController {
         }
     }
 }
-

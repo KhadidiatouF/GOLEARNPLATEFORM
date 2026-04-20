@@ -71,6 +71,7 @@ router.get("/by-user/:userId/formations", authenticate, async (req, res) => {
             const progress = totalChapitres > 0 ? Math.round((completeCount / totalChapitres) * 100) : 0;
             
             return {
+                apprenantFormationId: inscription.id,
                 id: inscription.formation.id,
                 title: inscription.formation.titre,
                 professor: `${inscription.formation.professeur?.utilisateur?.prenom || ""} ${inscription.formation.professeur?.utilisateur?.nom || "Inconnu"}`.trim(),
@@ -141,6 +142,7 @@ router.get("/:id/formations", authenticate, async (req, res) => {
             const progress = totalChapitres > 0 ? Math.round((completeCount / totalChapitres) * 100) : 0;
             
             return {
+                apprenantFormationId: inscription.id,
                 id: inscription.formation.id,
                 title: inscription.formation.titre,
                 professor: `${inscription.formation.professeur?.utilisateur?.prenom || ""} ${inscription.formation.professeur?.utilisateur?.nom || "Inconnu"}`.trim(),

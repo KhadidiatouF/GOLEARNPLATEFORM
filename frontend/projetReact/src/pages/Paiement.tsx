@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ArrowLeft, Clock, BookOpen, Infinity as InfinityIcon, Award, CheckCircle, Loader, Star, GraduationCap, Video, CreditCard } from 'lucide-react';
 import Header from '../components/Header';
 import { apiPaiement } from '../api/apiPaiement';
+import { apiFormation } from '../api/apiFormation';
 
 interface Formation {
   id: number;
@@ -63,21 +64,27 @@ const Paiement: React.FC = () => {
   const note = formation.note || 4.7;
   const instructeur = formation.instructeur || 'Équipe Golearn';
 
-  const handleFreeEnroll = () => {
-    const inscription = {
-      id: `${formation.id}-${user.id}`,
-      coursId: formation.id,
-      utilisateurId: user.id,
-      dateInscription: new Date().toISOString(),
-      coursTitre: formation.titre,
-      paiement: 'gratuit',
-      montant: 0,
-    };
-    const inscriptions = JSON.parse(localStorage.getItem('inscriptions') || '[]');
-    inscriptions.push(inscription);
-    localStorage.setItem('inscriptions', JSON.stringify(inscriptions));
-    setPaymentStatus('success');
-    setTimeout(() => navigate('/apprenant'), 2000);
+  const handleFreeEnroll = async () => {
+    setIsProcessing(true);
+    setPaymentStatus('idle');
+    setErrorMessage('');
+
+    try {
+      await apiFormation.inscriptionFormation(formation.id);
+      setPaymentStatus('success');
+      setTimeout(() => navigate('/apprenant'), 2000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur lors de l'inscription";
+      if (message.toLowerCase().includes('déjà inscrit')) {
+        setPaymentStatus('success');
+        setTimeout(() => navigate('/apprenant'), 2000);
+        return;
+      }
+      setPaymentStatus('error');
+      setErrorMessage(message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handlePayment = async () => {

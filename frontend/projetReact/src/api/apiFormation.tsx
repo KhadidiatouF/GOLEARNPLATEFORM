@@ -109,7 +109,16 @@ export const apiFormation = {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
-      if (!response.ok) throw new Error("Erreur lors de la suppression de la formation");
+      if (!response.ok) {
+        let errorMessage = "Erreur lors de la suppression de la formation";
+        try {
+          const errorBody = await response.json();
+          errorMessage = errorBody?.message || errorBody?.error || errorMessage;
+        } catch {
+          // Réponse vide ou non JSON
+        }
+        throw new Error(errorMessage);
+      }
       if (response.status === 204) {
         return true;
       }

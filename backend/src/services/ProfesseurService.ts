@@ -222,12 +222,14 @@ export class ProfesseurService{
 
         const resetData = await PasswordResetService.issueToken(result.utilisateurId);
 
-        await MailService.sendProfessorCredentialsEmail({
+        void MailService.sendProfessorCredentialsEmail({
             recipientEmail: demande.email,
             recipientName: `${demande.prenom} ${demande.nom}`.trim(),
             login: result.login,
             temporaryPassword,
             resetLink: resetData.resetLink
+        }).catch((error) => {
+            console.error("Erreur lors de l'envoi des identifiants professeur:", error);
         });
 
         return {

@@ -10,6 +10,7 @@ const getAuthHeaders = () => {
 
 // Interface pour les formations avec progression de l'apprenant
 interface EnrolledFormation {
+  apprenantFormationId: number;
   id: number;
   title: string;
   professor: string;

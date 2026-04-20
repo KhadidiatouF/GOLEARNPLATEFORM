@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { apiQuiz } from '../api/apiQuiz';
 import { apiCertif } from '../api/apiCertif';
+import { apiProgression } from '../api/apiProgression';
 import { useLocation } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -377,7 +378,7 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
             <p className="text-3xl font-bold text-gray-900">{score}/{totalQuestions}</p>
             <p className="text-gray-500 mt-1">bonnes réponses</p>
           </div>
-          <button onClick={handleContinue} className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${passed ? 'bg-purple-500 hover:bg-purple-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
+          <button onClick={handleContinue} className={`mx-auto inline-flex min-w-[220px] max-w-full justify-center rounded-xl px-6 py-3 text-white font-semibold transition-colors shadow-sm ${passed ? 'bg-purple-500 hover:bg-purple-600' : 'bg-orange-500 hover:bg-orange-600'}`}>
             {passed ? 'Passer à la session suivante' : 'Réessayer le quiz'}
           </button>
         </div>
@@ -397,7 +398,7 @@ function QuizContent({ content, onSuccess }: QuizContentProps) {
             </div>
           ))}
           <button onClick={() => setSubmitted(true)} disabled={Object.keys(answers).length < content.questions.length}
-            className="w-full py-3 bg-orange-500 text-white rounded-xl font-semibold hover:bg-orange-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
+            className="mx-auto inline-flex min-w-[220px] max-w-full justify-center rounded-xl bg-orange-500 px-6 py-3 text-white font-semibold transition-colors shadow-sm hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-40">
             Soumettre (60% requis)
           </button>
         </div>
@@ -564,14 +565,14 @@ function QuizWrapper({
         {passed ? (
           <button
             onClick={() => { if (onSuccess) onSuccess(percentage); }}
-            className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${accentClasses.successButton}`}
+            className={`mx-auto inline-flex min-w-[220px] max-w-full justify-center rounded-xl px-6 py-3 text-white font-semibold transition-colors shadow-sm ${accentClasses.successButton}`}
           >
             {isFinalQuiz ? "Voir mes certificats" : "Passer à la session suivante"}
           </button>
         ) : (
           <button
             onClick={() => { setAnswers({}); setSubmitted(false); }}
-            className={`w-full py-3 text-white rounded-xl font-semibold transition-colors shadow-sm ${accentClasses.retryButton}`}
+            className={`mx-auto inline-flex min-w-[220px] max-w-full justify-center rounded-xl px-6 py-3 text-white font-semibold transition-colors shadow-sm ${accentClasses.retryButton}`}
           >
             Réessayer le quiz
           </button>
@@ -596,7 +597,7 @@ function QuizWrapper({
         </div>
       ))}
       <button onClick={handleSubmit} disabled={Object.keys(answers).length < totalQuestions || coachLoading}
-        className={`w-full py-3 text-white rounded-xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm ${accentClasses.submit}`}>
+        className={`mx-auto inline-flex min-w-[220px] max-w-full justify-center rounded-xl px-6 py-3 text-white font-semibold transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-40 ${accentClasses.submit}`}>
         Soumettre ({requiredScore}% requis)
       </button>
     </div>
@@ -606,11 +607,12 @@ function QuizWrapper({
 interface CourseViewerProps {
   onBack: () => void;
   formationId?: number;
+  apprenantFormationId?: number;
   onCertificationEarned?: () => void;
   onOpenCertificates?: () => void;
 }
 
-export default function CourseViewer({ onBack, formationId, onCertificationEarned, onOpenCertificates }: CourseViewerProps) {
+export default function CourseViewer({ onBack, formationId, apprenantFormationId, onCertificationEarned, onOpenCertificates }: CourseViewerProps) {
   const location = useLocation();
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) as { id?: number } : null;
@@ -769,6 +771,19 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
   const [showAverageWarning, setShowAverageWarning] = useState(false);
   const [finalQuizQuestions, setFinalQuizQuestions] = useState<QuizQuestion[]>([]);
   const [finalQuizSaving, setFinalQuizSaving] = useState(false);
+  const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
+
+  const syncChapterCompletion = async (chapitreId?: number) => {
+    if (!apprenantFormationId || !chapitreId) {
+      return;
+    }
+
+    try {
+      await apiProgression.completeChapter(apprenantFormationId, chapitreId);
+    } catch (error) {
+      console.error("Erreur synchronisation chapitre:", error);
+    }
+  };
 
   useEffect(() => {
     if (!formation.id) return;
@@ -813,6 +828,72 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
       }
     }));
   }, [sessionProgress, finalQuizState.score, finalQuizState.passed, finalQuizState.certificationIssued, formation.id, currentUser?.id]);
+
+  useEffect(() => {
+    if (!apprenantFormationId || !formation.sessions?.length) {
+      return;
+    }
+
+    const hydrateProgression = async () => {
+      try {
+        const response = await apiProgression.getProgression(apprenantFormationId);
+        const progression = response?.data || response;
+        const completedChapterIds = new Set<number>(
+          (((progression?.chapitresCompletes as Array<{ chapitreId?: number; chapitre?: { id?: number } }>) || []))
+            .map((item) => Number(item?.chapitreId || item?.chapitre?.id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        );
+
+        if (completedChapterIds.size === 0) {
+          return;
+        }
+
+        setSessionProgress((prev) => {
+          const next = { ...prev };
+          let hasChanges = false;
+
+          formation.sessions.forEach((session) => {
+            const chapters = session.chapitres || [];
+            if (!chapters.length) return;
+
+            const existingState = next[session.id] || {
+              currentChapterIndex: 0,
+              chaptersCompleted: new Array(chapters.length).fill(false),
+              quizPassed: false,
+              quizScore: null,
+              quizAttempts: 0,
+              coachFeedback: null
+            };
+
+            const mergedCompletion = chapters.map((chapter, index) => {
+              return existingState.chaptersCompleted[index] || completedChapterIds.has(chapter.id);
+            });
+
+            const nextCurrentIndex = mergedCompletion.findIndex((completed) => !completed);
+            const normalizedIndex = nextCurrentIndex === -1 ? Math.max(chapters.length - 1, 0) : nextCurrentIndex;
+
+            const changed = mergedCompletion.some((value, index) => value !== existingState.chaptersCompleted[index])
+              || existingState.currentChapterIndex !== normalizedIndex;
+
+            if (changed) {
+              next[session.id] = {
+                ...existingState,
+                chaptersCompleted: mergedCompletion,
+                currentChapterIndex: normalizedIndex
+              };
+              hasChanges = true;
+            }
+          });
+
+          return hasChanges ? next : prev;
+        });
+      } catch (error) {
+        console.error("Erreur chargement progression:", error);
+      }
+    };
+
+    hydrateProgression();
+  }, [apprenantFormationId, formation.sessions]);
 
   useEffect(() => {
     if (!formation.sessions?.length) {
@@ -886,6 +967,10 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
         }
       };
     });
+
+    const session = formation.sessions.find((item) => item.id === sessionId);
+    const chapitreId = session?.chapitres?.[chapterIndex]?.id;
+    void syncChapterCompletion(chapitreId);
   };
 
   const handleNextChapter = () => {
@@ -1113,6 +1198,7 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
   useEffect(() => {
     setChapterContentViewed(false);
     setShowSessionQuiz(false);
+    setMobileSessionsOpen(false);
   }, [activeSessionId]);
 
   if (loading) {
@@ -1285,44 +1371,54 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
   };
 
   return (
-    <div className="flex h-full bg-gray-50 overflow-hidden" style={{ marginTop: '70px' }}>
+    <div className="relative flex h-full flex-col bg-gray-50 lg:flex-row" style={{ marginTop: '70px' }}>
 
       {/* ── Contenu principal ── */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="p-6 lg:p-18 w-full">
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="w-full p-4 sm:p-6 lg:p-10">
 
           {/* Bouton Retour */}
-          <div className="mb-4">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <button onClick={onBack} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
               <ChevronLeft size={16} />
               Retour aux formations
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileSessionsOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-xl border border-purple-200 bg-white px-4 py-2 text-sm font-medium text-purple-700 shadow-sm transition-colors hover:bg-purple-50 lg:hidden"
+            >
+              <BookOpen size={16} />
+              Voir les sessions
             </button>
           </div>
 
           {/* Breadcrumb */}
           {activeSession?.type === "article" && (activeSession.content as { breadcrumb?: string[] }).breadcrumb && (
-            <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-5 bg-white border border-gray-100 rounded-xl px-4 py-2.5 shadow-sm">
+            <nav className="mb-5 overflow-x-auto rounded-xl border border-gray-100 bg-white px-4 py-2.5 text-xs text-gray-400 shadow-sm">
+              <div className="flex min-w-max items-center gap-1.5">
               {(activeSession.content as { breadcrumb: string[] }).breadcrumb.map((crumb: string, i: number, arr: string[]) => (
                 <span key={i} className="flex items-center gap-1.5">
                   <span className={i === arr.length - 1 ? "text-gray-700 font-semibold" : "hover:text-gray-600 cursor-pointer"}>{crumb}</span>
                   {i < arr.length - 1 && <ChevronRight size={12} className="text-gray-300" />}
                 </span>
               ))}
+              </div>
             </nav>
           )}
 
           {renderSessionContent()}
 
           {/* Navigation prev/next */}
-          <div className="flex items-center justify-between mt-10 pt-6 border-t border-gray-100">
+          <div className="mb-18 flex flex-col gap-3 border-t border-gray-100 pt-2 sm:flex-row sm:items-center sm:justify-between">
             <button
               onClick={() => activeIndex > 0 && setActiveSessionId(formation.sessions[activeIndex - 1].id)}
               disabled={activeIndex === 0}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronLeft size={16} /> Précédent
             </button>
-            <span className="text-xs text-gray-400">{activeIndex + 1} / {formation.sessions.length}</span>
+            <span className="text-center text-xs text-gray-400">{activeIndex + 1} / {formation.sessions.length}</span>
             <button
               onClick={handleNextChapter}
               disabled={
@@ -1330,7 +1426,7 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
                 || (!chapterContentViewed && !showSessionQuiz)
                 || (activeIndex === formation.sessions.length - 1 && !activeSession?.quiz && (!activeSession?.chapitres || activeSession.chapitres.length === 0))
               }
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-500 rounded-xl hover:bg-purple-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center justify-center gap-2 rounded-xl bg-purple-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-600 disabled:cursor-not-allowed disabled:opacity-30"
               title={!chapterContentViewed && !showSessionQuiz ? "Vous devez d'abord lire le contenu du chapitre" : ""}
             >
               {!chapterContentViewed && !showSessionQuiz ? "Étudier d'abord" : "Suivant"} <ChevronRight size={16} />
@@ -1339,8 +1435,8 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
         </div>
       </main>
 
-      {/* ── Sidebar sessions ── */}
-      <aside className="w-1/5 shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-y-auto md:flex">
+      {/* ── Sidebar sessions desktop ── */}
+      <aside className="hidden w-full max-w-sm shrink-0 border-l border-gray-100 bg-white lg:flex lg:flex-col lg:overflow-y-auto">
 
         <div className="p-4 border-b border-gray-100 bg-gray-50">
           <h2 className="font-semibold text-gray-800 text-sm leading-snug w-full">{formation.title}</h2>
@@ -1417,6 +1513,101 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
         </div>
       </aside>
 
+      {/* ── Drawer sessions mobile ── */}
+      {mobileSessionsOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden" onClick={() => setMobileSessionsOpen(false)}>
+          <aside
+            className="absolute right-0 top-0 flex h-full w-full max-w-sm flex-col overflow-y-auto bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-4 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-purple-500">Sessions</p>
+                <h2 className="text-sm font-semibold text-gray-900">{formation.title}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileSessionsOpen(false)}
+                className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600"
+              >
+                Fermer
+              </button>
+            </div>
+
+            <div className="border-b border-gray-100 p-4">
+              <div className="flex items-start gap-3">
+                <img src={formation.professor.avatar} alt="" className="h-11 w-11 shrink-0 rounded-full border-2 border-purple-100 object-cover" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold text-gray-900">{formation.professor.name}</span>
+                    {formation.professor.verified && <CheckCircle size={13} className="shrink-0 text-purple-500" />}
+                  </div>
+                  <p className="text-xs text-gray-400">{formation.professor.role}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">Spécialité: {formation.professor.specialty}</p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="mb-1.5 flex justify-between text-xs text-gray-400">
+                  <span>Progression</span>
+                  <span className="font-semibold text-purple-600">{formation.progress}% Completed</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
+                  <div className="h-full rounded-full bg-purple-500 transition-all duration-500" style={{ width: `${formation.progress}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 p-3">
+              <p className="mb-3 px-1 text-xs font-semibold uppercase tracking-wider text-gray-400">Sessions de la formation</p>
+              <div className="space-y-1.5">
+                {formation.sessions.map((session: { id: number; title: string; type: string; duration: string; completed: boolean; locked: boolean }, index: number) => {
+                  const accessible = isSessionAccessible(index);
+                  return (
+                    <button
+                      key={session.id}
+                      onClick={() => {
+                        if (!accessible) return;
+                        setActiveSessionId(session.id);
+                        setMobileSessionsOpen(false);
+                      }}
+                      className={`w-full rounded-xl border px-3 py-3 text-left transition-all ${
+                        activeSessionId === session.id
+                          ? "border-purple-200 bg-purple-50"
+                          : !accessible
+                          ? "cursor-not-allowed border-transparent opacity-50"
+                          : "border-transparent hover:bg-gray-50"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2.5">
+                        <div className={`mt-0.5 shrink-0 rounded-lg border p-1.5 ${typeBadge(session.type)}`}>
+                          <SessionIcon type={session.type} size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs font-medium leading-snug ${activeSessionId === session.id ? "text-purple-700" : "text-gray-700"}`}>
+                            {session.title}
+                          </p>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <Clock size={10} className="text-gray-300" />
+                            <span className="text-[10px] text-gray-400">{session.duration}</span>
+                          </div>
+                        </div>
+                        <div className="mt-0.5 shrink-0">
+                          {session.completed ? (
+                            <CheckCircle size={13} className="text-purple-500" />
+                          ) : !accessible ? (
+                            <Lock size={12} className="text-gray-300" />
+                          ) : null}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* Popup moderne avertissement moyenne insuffisante */}
       {showAverageWarning && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1442,7 +1633,7 @@ export default function CourseViewer({ onBack, formationId, onCertificationEarne
 
             <button
               onClick={() => setShowAverageWarning(false)}
-              className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold transition-colors"
+              className="mx-auto inline-flex min-w-[240px] max-w-full justify-center rounded-xl bg-orange-500 px-6 py-3 text-white font-semibold transition-colors hover:bg-orange-600"
             >
               Compris, je continue ma formation
             </button>

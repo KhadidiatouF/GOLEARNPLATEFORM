@@ -16,16 +16,18 @@ const DEFAULT_PREFERENCES: DashboardPreferences = {
   pushNotifications: false,
 };
 
-export function getDashboardPreferenceKey(role: UserRole): string {
-  return `dashboard-preferences:${role}`;
+export function getDashboardPreferenceKey(role: UserRole, userId?: number | null): string {
+  return userId ? `dashboard-preferences:${role}:${userId}` : `dashboard-preferences:${role}`;
 }
 
-export function getDashboardPreferences(role: UserRole): DashboardPreferences {
+export function getDashboardPreferences(role: UserRole, userId?: number | null): DashboardPreferences {
   if (typeof window === 'undefined') {
     return DEFAULT_PREFERENCES;
   }
 
-  const raw = localStorage.getItem(getDashboardPreferenceKey(role));
+  const raw =
+    localStorage.getItem(getDashboardPreferenceKey(role, userId)) ||
+    localStorage.getItem(getDashboardPreferenceKey(role));
   if (!raw) return DEFAULT_PREFERENCES;
 
   try {
@@ -38,13 +40,14 @@ export function getDashboardPreferences(role: UserRole): DashboardPreferences {
   }
 }
 
-export function saveDashboardPreferences(role: UserRole, preferences: DashboardPreferences) {
+export function saveDashboardPreferences(role: UserRole, preferences: DashboardPreferences, userId?: number | null) {
   if (typeof window === 'undefined') return;
 
-  localStorage.setItem(getDashboardPreferenceKey(role), JSON.stringify(preferences));
+  localStorage.setItem(getDashboardPreferenceKey(role, userId), JSON.stringify(preferences));
   window.dispatchEvent(new CustomEvent('dashboard-preferences-updated', {
     detail: {
       role,
+      userId,
       preferences,
     },
   }));

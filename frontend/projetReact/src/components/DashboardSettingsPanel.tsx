@@ -33,14 +33,14 @@ export default function DashboardSettingsPanel({
   securityText,
 }: DashboardSettingsPanelProps) {
   const { user, updateUser } = useAuth();
-  const [preferences, setPreferences] = useState<DashboardPreferences>(() => getDashboardPreferences(role));
+  const [preferences, setPreferences] = useState<DashboardPreferences>(() => getDashboardPreferences(role, user?.id));
   const [displayName, setDisplayName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [savedMessage, setSavedMessage] = useState('');
 
   useEffect(() => {
-    setPreferences(getDashboardPreferences(role));
-  }, [role]);
+    setPreferences(getDashboardPreferences(role, user?.id));
+  }, [role, user?.id]);
 
   useEffect(() => {
     setDisplayName(user?.name || '');
@@ -67,7 +67,7 @@ export default function DashboardSettingsPanel({
   };
 
   const handleSave = () => {
-    saveDashboardPreferences(role, preferences);
+    saveDashboardPreferences(role, preferences, user?.id);
     updateUser({
       name: displayName.trim() || user?.name || '',
       email: email.trim() || user?.email || '',

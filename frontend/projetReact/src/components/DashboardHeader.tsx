@@ -49,7 +49,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
     }
 
     const syncPreferences = () => {
-      const preferences = getDashboardPreferences(user.role);
+      const preferences = getDashboardPreferences(user.role, user.id);
       setThemeColor(preferences.themeColor || color);
       setProfilePhoto(preferences.profilePhoto);
     };
@@ -60,7 +60,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ color }) => {
     return () => {
       window.removeEventListener('dashboard-preferences-updated', syncPreferences);
     };
-  }, [color, user?.role]);
+  }, [color, user?.id, user?.role]);
 
   const colors = colorMap[themeColor];
 

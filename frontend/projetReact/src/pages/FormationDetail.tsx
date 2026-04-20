@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, Users, Award, CheckCircle, PlayCircle, Star, Lock } from 'lucide-react';
 import Header from '../components/Header';
 import PaymentModal from '../components/PaymentModal';
+import LoadingSpinner from '../components/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
 import { apiFormation } from '../api/apiFormation';
 
@@ -31,33 +32,36 @@ const FormationDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [enrollmentMessage, setEnrollmentMessage] = useState<string | null>(null);
+  const [isEnrolling, setIsEnrolling] = useState(false);
 
   // Gérer l'inscription à un cours gratuit
-  const handleFreeEnrollment = () => {
+  const handleFreeEnrollment = async () => {
     if (!isAuthenticated) {
       // Rediriger vers la page de connexion
       navigate('/login', { state: { from: { pathname: `/formations/${id}` } } });
       return;
     }
 
-    // Simuler l'inscription
-    const inscription = {
-      id: Math.random(),
-      coursId: cours?.id,
-      utilisateurId: user?.id,
-      dateInscription: new Date().toISOString(),
-      coursTitre: cours?.titre
-    };
+    if (!cours?.id) return;
 
-    console.log('Inscription créée (gratuit):', inscription);
-
-    // Afficher le message de succès
-    setEnrollmentMessage(`Inscription au cours "${cours?.titre}" réussie ! Vous pouvez maintenant accéder au contenu.`);
-
-    // Rediriger vers le dashboard après 2 secondes
-    setTimeout(() => {
-      navigate('/apprenant');
-    }, 2000);
+    try {
+      setIsEnrolling(true);
+      await apiFormation.inscriptionFormation(cours.id);
+      setEnrollmentMessage(`Inscription au cours "${cours.titre}" réussie ! Vous pouvez maintenant accéder au contenu.`);
+      setTimeout(() => {
+        navigate('/apprenant');
+      }, 2000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur lors de l'inscription";
+      if (message.toLowerCase().includes('déjà inscrit')) {
+        navigate('/apprenant');
+        return;
+      }
+      console.error('Erreur inscription formation gratuite:', error);
+      setEnrollmentMessage(message);
+    } finally {
+      setIsEnrolling(false);
+    }
   };
 
   // Gérer l'inscription à un cours payant
@@ -169,9 +173,7 @@ const FormationDetail: React.FC = () => {
     return (
       <div className="w-screen bg-gray-50 min-h-screen">
         <Header />
-        <div className="flex items-center justify-center h-screen">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-[#a855f7]"></div>
-        </div>
+        <LoadingSpinner label="Chargement de la formation..." className="min-h-[70vh]" size="lg" />
       </div>
     );
   }
@@ -237,9 +239,10 @@ const FormationDetail: React.FC = () => {
                 )}
                 <button 
                   onClick={() => isGratuit ? handleFreeEnrollment() : handlePaidEnrollment()}
-                  className="w-full py-4 bg-[#a855f7] text-white rounded-xl font-bold text-lg hover:bg-purple-700 transition shadow-lg"
+                  disabled={isGratuit && isEnrolling}
+                  className="w-full py-4 bg-[#a855f7] text-white rounded-xl font-bold text-lg hover:bg-purple-700 transition shadow-lg disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  {isGratuit ? 'Commencer maintenant' : "S'inscrire"}
+                  {isGratuit ? (isEnrolling ? 'Inscription...' : 'Commencer maintenant') : "S'inscrire"}
                 </button>
                 <p className="text-gray-400 text-sm mt-4">
                   {isGratuit 
@@ -406,9 +409,10 @@ const FormationDetail: React.FC = () => {
           </p>
           <button 
             onClick={() => isGratuit ? handleFreeEnrollment() : handlePaidEnrollment()}
-            className="px-8 py-4 bg-white text-[#a855f7] rounded-full font-bold text-lg hover:bg-gray-100 transition shadow-xl"
+            disabled={isGratuit && isEnrolling}
+            className="px-8 py-4 bg-white text-[#a855f7] rounded-full font-bold text-lg hover:bg-gray-100 transition shadow-xl disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {isGratuit ? 'Commencer maintenant' : "S'inscrire maintenant"}
+            {isGratuit ? (isEnrolling ? 'Inscription...' : 'Commencer maintenant') : "S'inscrire maintenant"}
           </button>
         </div>
       </section>
